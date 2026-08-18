@@ -5,11 +5,10 @@
 
 """haashi - utility toolkit."""
 
-from . import benchmark, utility
+from . import utility
 
 __version__ = "2.0.0"
 
 __all__ = [
-    'benchmark',
     'utility'
 ]

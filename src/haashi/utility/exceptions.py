@@ -1,20 +1,26 @@
 
 
-# benchmark/exceptions.py
+# src/haashi/utility/exceptions.py
 
 
-"""Custom exceptions for benchmark module."""
+"""Custom exceptions for utility-related operations."""
 
 
-class BenchmarkError(Exception):
+class UtilityError(Exception):
+    """Base exception for all utility-related errors."""
+
+
+class FileOperationError(UtilityError):
+    """Raised when file operations fail."""
+
+
+class BenchmarkError(UtilityError):
     """
-    Base exception for benchmark-related errors.
-
     Raised when benchmarking operations fail unexpectedly.
     """
 
 
-class InvalidFunctionError(BenchmarkError):
+class InvalidFunctionError(UtilityError):
     """
     Raised when provided function is invalid or not callable.
 
@@ -25,7 +31,7 @@ class InvalidFunctionError(BenchmarkError):
     """
 
 
-class BenchmarkTimeoutError(BenchmarkError):
+class BenchmarkTimeoutError(UtilityError):
     """
     Raised when benchmark exceeds maximum allowed time.
 
