@@ -22,34 +22,22 @@ import os
 import sys
 import textwrap
 import time
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any, Union
-
-from .exceptions import BenchmarkError, InvalidFunctionError
 import timeit
 from collections.abc import Callable
 from contextlib import contextmanager, nullcontext, redirect_stderr, redirect_stdout
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+from .exceptions import (
+    BenchmarkError,
+    FileOperationError,
+    InvalidFunctionError,
+)
 
 # Type aliases
-PathLike = Union[str, Path]
-JsonFormat = Union[dict[Any, Any], list[Any]]
-
-
-# ============================================================================
-# CUSTOM EXCEPTIONS
-# ============================================================================
-
-class UtilityError(Exception):
-    """Base exception for all utility-related errors."""
-
-
-class FileOperationError(UtilityError):
-    """Raised when file operations fail."""
-
-
-class ClipboardError(UtilityError):
-    """Raised when clipboard operations fail (Termux-specific)."""
+PathLike = str | Path
+JsonFormat = dict[Any, Any] | list[Any]
 
 
 # ============================================================================
@@ -318,7 +306,7 @@ class Logger:
             error_log_path: Optional path for JSON error logging. 
             If None, uses default.
         """
-        self.logger = logging.getLogger("haashi_pkg")
+        self.logger = logging.getLogger("haashi")
         self.logger.setLevel(level)
 
         # Prevent duplicate handlers
@@ -547,11 +535,7 @@ class FileHandler:
             >>> # New: my-project/lib/src/modules/analysis.py
             >>> # Still finds my-project/ correctly! 
             >>> 
-            >>> # Use with DataSaver
-            >>> from haashi_pkg.data_engine import DataSaver
-            >>> saver = DataSaver()
-            >>> if project_root:
-            ...     saver.save_csv(df, project_root / "results.csv")
+
         """
         if start_path is None:
             # Get the CALLER's file location using inspect
