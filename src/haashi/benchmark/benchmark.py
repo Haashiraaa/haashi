@@ -5,14 +5,15 @@
 
 """Benchmarking and performance profiling utilities."""
 
-import timeit
 import logging
 import os
-from contextlib import (
-    contextmanager, redirect_stdout, redirect_stderr, nullcontext
-)
-from typing import Callable, Any, Optional
+import timeit
+from collections.abc import Callable
+from contextlib import contextmanager, nullcontext, redirect_stderr, redirect_stdout
+from typing import Any
+
 from haashi_pkg.utility import Logger
+
 from .exceptions import BenchmarkError, InvalidFunctionError
 
 
@@ -36,7 +37,7 @@ class Benchmark:
         Function took 0.0234s on average
     """
 
-    def __init__(self, logger: Optional[Logger] = None) -> None:
+    def __init__(self, logger: Logger | None = None) -> None:
         """
         Initialize Benchmark with optional logger.
 
@@ -57,7 +58,7 @@ class Benchmark:
 
     def _warmup(
         self,
-        func: Optional[Callable[[], Any]],
+        func: Callable[[], Any] | None,
         times: int = 3,
         suppress_output: bool = True,
     ) -> None:
@@ -91,7 +92,7 @@ class Benchmark:
 
     def measure_time(
         self,
-        func: Optional[Callable[[], Any]],
+        func: Callable[[], Any] | None,
         warmup_times: int = 3,
         run_times: int = 5,
         repeat_times: int = 1,
@@ -170,6 +171,6 @@ class Benchmark:
             raise
 
         except Exception as e:
-            error_msg = f"Failed to benchmark function: {str(e)}"
+            error_msg = f"Failed to benchmark function: {e!s}"
             self.logger.error(error_msg)
             raise BenchmarkError(error_msg) from e

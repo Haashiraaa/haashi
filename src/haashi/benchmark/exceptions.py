@@ -12,7 +12,6 @@ class BenchmarkError(Exception):
 
     Raised when benchmarking operations fail unexpectedly.
     """
-    pass
 
 
 class InvalidFunctionError(BenchmarkError):
@@ -24,7 +23,6 @@ class InvalidFunctionError(BenchmarkError):
         >>> bench.measure_time("not a function")
         InvalidFunctionError: Expected callable function, got str
     """
-    pass
 
 
 class BenchmarkTimeoutError(BenchmarkError):
@@ -34,4 +32,3 @@ class BenchmarkTimeoutError(BenchmarkError):
     This exception can be used in future implementations to handle
     benchmarks that take too long to execute.
     """
-    pass

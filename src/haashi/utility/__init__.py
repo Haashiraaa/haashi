@@ -45,22 +45,20 @@ Legacy Usage (Deprecated - still works with warnings):
 """
 
 from haashi_pkg.utility.utils import (
-    # Modern classes (recommended)
-    Logger,
-    ErrorLogger,
-    FileHandler,
-    ScreenUtil,
-    DateTimeUtil,
+    ClipboardError,
     ClipboardUtil,
     Colors,
-
+    DateTimeUtil,
+    ErrorLogger,
+    FileHandler,
+    FileOperationError,
+    # Modern classes (recommended)
+    Logger,
+    ScreenUtil,
     # Legacy class (deprecated)
     Utility,
-
     # Exceptions
     UtilityError,
-    FileOperationError,
-    ClipboardError,
 )
 
 __all__ = [

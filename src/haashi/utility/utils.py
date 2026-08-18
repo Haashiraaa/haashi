@@ -15,22 +15,21 @@ Author: Haashiraaa
 
 from __future__ import annotations
 
-import os
-import textwrap
-import logging
-import sys
-import json
-import time
-import subprocess
 import inspect
-from typing import Any, List, Union, Optional, Dict
-from pathlib import Path
+import json
+import logging
+import os
+import subprocess
+import sys
+import textwrap
+import time
 from datetime import datetime, timedelta, timezone
-
+from pathlib import Path
+from typing import Any, Union
 
 # Type aliases
 PathLike = Union[str, Path]
-JsonFormat = Union[Dict[Any, Any], List[Any]]
+JsonFormat = Union[dict[Any, Any], list[Any]]
 
 
 # ============================================================================
@@ -39,17 +38,14 @@ JsonFormat = Union[Dict[Any, Any], List[Any]]
 
 class UtilityError(Exception):
     """Base exception for all utility-related errors."""
-    pass
 
 
 class FileOperationError(UtilityError):
     """Raised when file operations fail."""
-    pass
 
 
 class ClipboardError(UtilityError):
     """Raised when clipboard operations fail (Termux-specific)."""
-    pass
 
 
 # ============================================================================
@@ -148,7 +144,7 @@ class ErrorLogger:
 
         return fallback
 
-    def _read_errors(self, path: Path) -> List[JsonFormat]:
+    def _read_errors(self, path: Path) -> list[JsonFormat]:
         """
         Read existing errors from JSON file.
 
@@ -168,7 +164,7 @@ class ErrorLogger:
 
         return []
 
-    def _write_errors(self, errors: List[JsonFormat], path: Path) -> None:
+    def _write_errors(self, errors: list[JsonFormat], path: Path) -> None:
         """
         Write errors to JSON file.
 
@@ -186,8 +182,8 @@ class ErrorLogger:
     def log_error(
         self,
         exception: Exception,
-        context: Optional[str] = None,
-        path: Optional[PathLike] = None,
+        context: str | None = None,
+        path: PathLike | None = None,
         use_script_dir: bool = True
     ) -> None:
         """
@@ -241,7 +237,7 @@ class ErrorLogger:
         # Write back to file
         self._write_errors(existing_errors, error_path)
 
-    def clear_errors(self, path: Optional[PathLike] = None) -> None:
+    def clear_errors(self, path: PathLike | None = None) -> None:
         """
         Clear all errors from the log file.
 
@@ -255,9 +251,9 @@ class ErrorLogger:
 
     def get_errors(
         self,
-        path: Optional[PathLike] = None,
-        limit: Optional[int] = None
-    ) -> List[JsonFormat]:
+        path: PathLike | None = None,
+        limit: int | None = None
+    ) -> list[JsonFormat]:
         """
         Retrieve errors from log file.
 
@@ -308,7 +304,7 @@ class Logger:
     def __init__(
         self,
         level: int = logging.WARNING,
-        error_log_path: Optional[PathLike] = None,
+        error_log_path: PathLike | None = None,
     ) -> None:
         """
         Initialize the logger.
@@ -362,11 +358,11 @@ class Logger:
     def error(
         self,
         message: Any | None = "Error occurred!",
-        path: Optional[PathLike] = None,
-        exception: Optional[Exception] = None,
+        path: PathLike | None = None,
+        exception: Exception | None = None,
         save_to_json: bool = False,
         use_script_dir: bool = True,
-        context: Optional[str] = None
+        context: str | None = None
     ) -> None:
         """
         Log error message to console and optionally to JSON.
@@ -423,7 +419,7 @@ class FileHandler:
         >>> data = file_handler.read_json("data/output.json")
     """
 
-    def __init__(self, logger: Optional[Logger] = None) -> None:
+    def __init__(self, logger: Logger | None = None) -> None:
         """
         Initialize file handler.
 
@@ -435,7 +431,7 @@ class FileHandler:
     def get_parent_path(
         self,
         levels_up: int = 1,
-        start_path: Optional[PathLike] = None
+        start_path: PathLike | None = None
     ) -> Path:
         """
         Get path to parent directory N levels up from CALLER's script location.
@@ -506,9 +502,9 @@ class FileHandler:
     def get_ancestor_by_name(
         self,
         folder_name: str,
-        start_path: Optional[PathLike] = None,
+        start_path: PathLike | None = None,
         max_levels: int = 10
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """
         Find ancestor directory by folder name, starting from CALLER's location.
 
@@ -941,7 +937,7 @@ class ScreenUtil:
             >>> wrapped = ScreenUtil.format_text(long_text, width=20)
         """
         wrapper = textwrap.TextWrapper(width=width)
-        formatted: List[str] = []
+        formatted: list[str] = []
 
         for line in text.split("\n"):
             if not line.strip():
@@ -1023,7 +1019,7 @@ class Colors:
 
     @classmethod
     def colored(
-            cls, text: str, color: str, style: Optional[str] = None) -> str:
+            cls, text: str, color: str, style: str | None = None) -> str:
         """
         Return colored text
 
@@ -1087,7 +1083,7 @@ class DateTimeUtil:
         utc_offset_hours: int = 0,
         string_format: bool = True,
         only_date: bool = True
-    ) -> Union[str, datetime]:
+    ) -> str | datetime:
         """
         Get current time with optional UTC offset.
 
@@ -1233,7 +1229,7 @@ class Utility:
             level: Logging level (logging.INFO, logging.DEBUG, etc.).
         """
         # Predefined text messages (legacy)
-        self.text: Dict[str, str] = {
+        self.text: dict[str, str] = {
             "ERROR": "\nOops! Something went wrong.",
             "END": "\n[Program finished]",
             "MISSING_FILE": "\nFile path not found.",
