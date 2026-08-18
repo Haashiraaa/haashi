@@ -14,9 +14,12 @@ authors = [
 ]
 keywords = [  
     "utilities",
+    "logging",
+    "benchmarking",
+    "toolkit"
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -32,8 +35,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "black>=23.0.0",
-    "mypy>=1.0.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
     "pyright",
     "autopep8"
@@ -45,9 +47,12 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# TODO: Modify urls
+[tool.setuptools.dynamic]
+version = {attr = "haashi.__version__"}
+
+
 [project.urls]
 Homepage = "https://github.com/Haashiraaa"
-Repository = "https://github.com/Haashiraaa/haashi-analytics-toolkit"
-Documentation = "https://github.com/Haashiraaa/haashi-analytics-toolkit/blob/main/README.md"
-Issues = "https://github.com/Haashiraaa/haashi-analytics-toolkit/issues"
+Repository = "https://github.com/Haashiraaa/haashi"
+Documentation = "https://github.com/Haashiraaa/haashi/blob/main/README.md"
+Issues = "https://github.com/Haashiraaa/haashi/issues"
