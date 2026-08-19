@@ -62,24 +62,24 @@ jobs:
           release_title = f"{version}"
           if header_match:
               header = header_match.group(0)
-              subtitle_match = re.search(r'[-—–]\s*\d{4}-\d{2}-\d{2}\s*[-—–]\s*(.+)', header)
+              subtitle_match = re.search(r'[-ΓÇöΓÇô]\s*\d{4}-\d{2}-\d{2}\s*[-ΓÇöΓÇô]\s*(.+)', header)
               if subtitle_match:
                   subtitle = subtitle_match.group(1).strip()
-                  release_title = f"{version} — {subtitle}"
-                  print(f"✅ Found title: {release_title}")
+                  release_title = f"{version} ΓÇö {subtitle}"
+                  print(f"Γ£à Found title: {release_title}")
               else:
-                  print(f"ℹ️ No subtitle found, using version only: {release_title}")
+                  print(f"Γä╣∩╕Å No subtitle found, using version only: {release_title}")
 
           body_pattern = rf'(?m)^##\s+\[v?{re.escape(version)}\][^\n]*\n(.*?)(?=^##\s+\[v?[0-9]|\Z)'
           body_match = re.search(body_pattern, content, re.DOTALL)
 
           if body_match:
               body = body_match.group(1).strip()
-              print(f"✅ Found changelog body for {version}")
+              print(f"Γ£à Found changelog body for {version}")
               with open("extracted.md", "w") as f:
                   f.write(body)
           else:
-              print(f"⚠️ No body found for {version}")
+              print(f"ΓÜá∩╕Å No body found for {version}")
               with open("extracted.md", "w") as f:
                   f.write("See [CHANGELOG.md](./CHANGELOG.md) for full details.")
 

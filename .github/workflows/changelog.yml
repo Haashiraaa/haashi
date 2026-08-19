@@ -35,4 +35,3 @@ jobs:
           fi
 
           echo "Changelog entry found for $VERSION"
-

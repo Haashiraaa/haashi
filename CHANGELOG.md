@@ -21,6 +21,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v2.0.0] - 2026-08-19 - Package Rename & Utility-Only Rewrite
+
+### Changed
+- **BREAKING**: Package renamed from `haashi_pkg` to `haashi`.
+  Install with `pip install haashi`, import as `import haashi`.
+- **BREAKING**: `benchmark` module folded into `utility` — there is no
+  longer a separate `haashi.benchmark` module. Import `Benchmark` from
+  `haashi.utility` instead.
+
+### Removed
+- **BREAKING**: `data_engine` module removed entirely, including
+  `DataAnalyzer`, `DataLoader`, `DataSaver`, and all related exceptions
+  (`DataEngineError`, `DataValidationError`, `DataTypeError`,
+  `FileLoadError`, `FileSaveError`).
+- **BREAKING**: `plot_engine` module removed entirely, including
+  `PlotEngine`, `QuickPlot`, `PowerCanvas`, and all related exceptions
+  (`PlotEngineError`, `InvalidPlotTypeError`, `InvalidDataError`,
+  `ConfigurationError`).
+- **BREAKING**: Dropped dependencies on `pandas`, `numpy`, `matplotlib`,
+  `seaborn`, `pyarrow`, and `openpyxl`. `haashi` now has zero runtime
+  dependencies.
+- Removed the legacy `Utility` wrapper class (previously deprecated,
+  scheduled for removal since v1.0.0).
+- Removed `ClipboardUtil`.
+
+### Migration Notes
+- If you rely on `data_engine` or `plot_engine`, do not upgrade — pin
+  `haashi_pkg<2.0` and continue using the old package. There is no
+  successor for these modules in `haashi`.
+- If you only use `utility` classes (`Logger`, `FileHandler`,
+  `ScreenUtil`, `DateTimeUtil`, `Colors`, `Benchmark`), update your
+  imports:
+```python
+  # Before
+  from haashi_pkg.utility import Logger
+  from haashi_pkg.benchmark import Benchmark
+
+  # After
+  from haashi.utility import Logger, Benchmark
+```
+- `haashi_pkg` will continue to receive a deprecation-warning-only
+  release (see v1.8.1) but no further functional updates.
+
+---
+
 ## [v1.8.1] - 2026-08-19 - Deprecation Notice
 
 ### Changed

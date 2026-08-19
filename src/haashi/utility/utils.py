@@ -1,6 +1,6 @@
 
 """
-Utility Module for haashi_pkg
+Utility Module for haashi
 ==============================
 
 Provides utility classes for:
@@ -8,48 +8,36 @@ Provides utility classes for:
 - File operations (JSON, TXT)
 - Screen manipulation (clear, animations)
 - Datetime helpers
-- Clipboard operations (Termux)
+
 
 Author: Haashiraaa
 """
 
 from __future__ import annotations
 
-import os
-import textwrap
-import logging
-import sys
-import json
-import time
-import subprocess
 import inspect
-from typing import Any, List, Union, Optional, Dict
-from pathlib import Path
+import json
+import logging
+import os
+import sys
+import textwrap
+import time
+import timeit
+from collections.abc import Callable
+from contextlib import contextmanager, nullcontext, redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
+from .exceptions import (
+    BenchmarkError,
+    FileOperationError,
+    InvalidFunctionError,
+)
 
 # Type aliases
-PathLike = Union[str, Path]
-JsonFormat = Union[Dict[Any, Any], List[Any]]
-
-
-# ============================================================================
-# CUSTOM EXCEPTIONS
-# ============================================================================
-
-class UtilityError(Exception):
-    """Base exception for all utility-related errors."""
-    pass
-
-
-class FileOperationError(UtilityError):
-    """Raised when file operations fail."""
-    pass
-
-
-class ClipboardError(UtilityError):
-    """Raised when clipboard operations fail (Termux-specific)."""
-    pass
+PathLike = str | Path
+JsonFormat = dict[Any, Any] | list[Any]
 
 
 # ============================================================================
@@ -148,7 +136,7 @@ class ErrorLogger:
 
         return fallback
 
-    def _read_errors(self, path: Path) -> List[JsonFormat]:
+    def _read_errors(self, path: Path) -> list[JsonFormat]:
         """
         Read existing errors from JSON file.
 
@@ -168,7 +156,7 @@ class ErrorLogger:
 
         return []
 
-    def _write_errors(self, errors: List[JsonFormat], path: Path) -> None:
+    def _write_errors(self, errors: list[JsonFormat], path: Path) -> None:
         """
         Write errors to JSON file.
 
@@ -186,8 +174,8 @@ class ErrorLogger:
     def log_error(
         self,
         exception: Exception,
-        context: Optional[str] = None,
-        path: Optional[PathLike] = None,
+        context: str | None = None,
+        path: PathLike | None = None,
         use_script_dir: bool = True
     ) -> None:
         """
@@ -241,7 +229,7 @@ class ErrorLogger:
         # Write back to file
         self._write_errors(existing_errors, error_path)
 
-    def clear_errors(self, path: Optional[PathLike] = None) -> None:
+    def clear_errors(self, path: PathLike | None = None) -> None:
         """
         Clear all errors from the log file.
 
@@ -255,9 +243,9 @@ class ErrorLogger:
 
     def get_errors(
         self,
-        path: Optional[PathLike] = None,
-        limit: Optional[int] = None
-    ) -> List[JsonFormat]:
+        path: PathLike | None = None,
+        limit: int | None = None
+    ) -> list[JsonFormat]:
         """
         Retrieve errors from log file.
 
@@ -308,7 +296,7 @@ class Logger:
     def __init__(
         self,
         level: int = logging.WARNING,
-        error_log_path: Optional[PathLike] = None,
+        error_log_path: PathLike | None = None,
     ) -> None:
         """
         Initialize the logger.
@@ -318,7 +306,7 @@ class Logger:
             error_log_path: Optional path for JSON error logging. 
             If None, uses default.
         """
-        self.logger = logging.getLogger("haashi_pkg")
+        self.logger = logging.getLogger("haashi")
         self.logger.setLevel(level)
 
         # Prevent duplicate handlers
@@ -362,11 +350,11 @@ class Logger:
     def error(
         self,
         message: Any | None = "Error occurred!",
-        path: Optional[PathLike] = None,
-        exception: Optional[Exception] = None,
+        path: PathLike | None = None,
+        exception: Exception | None = None,
         save_to_json: bool = False,
         use_script_dir: bool = True,
-        context: Optional[str] = None
+        context: str | None = None
     ) -> None:
         """
         Log error message to console and optionally to JSON.
@@ -423,7 +411,7 @@ class FileHandler:
         >>> data = file_handler.read_json("data/output.json")
     """
 
-    def __init__(self, logger: Optional[Logger] = None) -> None:
+    def __init__(self, logger: Logger | None = None) -> None:
         """
         Initialize file handler.
 
@@ -435,7 +423,7 @@ class FileHandler:
     def get_parent_path(
         self,
         levels_up: int = 1,
-        start_path: Optional[PathLike] = None
+        start_path: PathLike | None = None
     ) -> Path:
         """
         Get path to parent directory N levels up from CALLER's script location.
@@ -506,9 +494,9 @@ class FileHandler:
     def get_ancestor_by_name(
         self,
         folder_name: str,
-        start_path: Optional[PathLike] = None,
+        start_path: PathLike | None = None,
         max_levels: int = 10
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """
         Find ancestor directory by folder name, starting from CALLER's location.
 
@@ -547,11 +535,7 @@ class FileHandler:
             >>> # New: my-project/lib/src/modules/analysis.py
             >>> # Still finds my-project/ correctly! 
             >>> 
-            >>> # Use with DataSaver
-            >>> from haashi_pkg.data_engine import DataSaver
-            >>> saver = DataSaver()
-            >>> if project_root:
-            ...     saver.save_csv(df, project_root / "results.csv")
+
         """
         if start_path is None:
             # Get the CALLER's file location using inspect
@@ -941,7 +925,7 @@ class ScreenUtil:
             >>> wrapped = ScreenUtil.format_text(long_text, width=20)
         """
         wrapper = textwrap.TextWrapper(width=width)
-        formatted: List[str] = []
+        formatted: list[str] = []
 
         for line in text.split("\n"):
             if not line.strip():
@@ -1023,7 +1007,7 @@ class Colors:
 
     @classmethod
     def colored(
-            cls, text: str, color: str, style: Optional[str] = None) -> str:
+            cls, text: str, color: str, style: str | None = None) -> str:
         """
         Return colored text
 
@@ -1087,7 +1071,7 @@ class DateTimeUtil:
         utc_offset_hours: int = 0,
         string_format: bool = True,
         only_date: bool = True
-    ) -> Union[str, datetime]:
+    ) -> str | datetime:
         """
         Get current time with optional UTC offset.
 
@@ -1115,261 +1099,163 @@ class DateTimeUtil:
 
 
 # ============================================================================
-# CLIPBOARD UTILITIES (TERMUX-SPECIFIC)
+# BENCHMARK UTILITIES
 # ============================================================================
 
-class ClipboardUtil:
+class Benchmark:
     """
-    Termux clipboard operations.
+    Performance benchmarking and timing utilities.
 
-    WARNING: Only works in Termux environment on Android.
-    Will raise ClipboardError if termux-api is not installed.
+    Provides methods to measure execution time and profile functions.
 
     Example:
-        >>> clipboard = ClipboardUtil()
-        >>> clipboard.copy("Hello World")
-        >>> text = clipboard.paste()
+        >>> from haashi_pkg.benchmark import Benchmark
+        >>> 
+        >>> bench = Benchmark()
+        >>> 
+        >>> def my_function():
+        ...     return sum(range(1000000))
+        >>> 
+        >>> avg_time = bench.measure_time(my_function, run_times=10)
+        [INFO] Average execution time: 0.0234 seconds
+        >>> print(f"Function took {avg_time:.4f}s on average")
+        Function took 0.0234s on average
     """
 
-    @staticmethod
-    def copy(text: str) -> None:
+    def __init__(self, logger: Logger | None = None) -> None:
         """
-        Copy text to Termux clipboard.
+        Initialize Benchmark with optional logger.
 
         Args:
-            text: String to copy to clipboard.
-
-        Raises:
-            ClipboardError: If termux-clipboard-set command fails.
-
-        Example:
-            >>> ClipboardUtil.copy("Hello World")
+            logger: Optional Logger instance (default: creates INFO logger)
         """
-        try:
-            subprocess.run(
-                ["termux-clipboard-set"],
-                input=text,
-                text=True,
-                check=True
+        self.logger = logger or Logger(level=logging.INFO)
+
+    @contextmanager
+    def _suppress_output(self):
+        with open(os.devnull, "w") as null:
+            with redirect_stdout(null), redirect_stderr(null):
+                logging.disable(logging.CRITICAL)
+                try:
+                    yield
+                finally:
+                    logging.disable(logging.NOTSET)
+
+    def _warmup(
+        self,
+        func: Callable[[], Any] | None,
+        times: int = 3,
+        suppress_output: bool = True,
+    ) -> None:
+        """
+        Warm up a function by running it multiple times.
+
+        This is useful for ensuring the function is optimized and ready for benchmarking.
+
+        Args:
+            func: Callable function to warm up (must take no arguments)
+            times: Number of times to run the function (default: 3)
+
+        """
+        # Validate inputs
+        if times < 1:
+            raise ValueError(f"times must be at least 1, got {times}")
+
+        if not callable(func):
+            raise InvalidFunctionError(
+                f"Expected callable function, got {type(func).__name__}"
             )
-        except subprocess.CalledProcessError as e:
-            raise ClipboardError(
-                "Failed to copy to clipboard. Is termux-api installed?"
-            ) from e
-        except FileNotFoundError as e:
-            raise ClipboardError(
-                "termux-clipboard-set not found. Install termux-api package."
-            ) from e
 
-    @staticmethod
-    def paste() -> str:
+        self.logger.debug(f"Warming up function {times} times...")
+
+        ctx = self._suppress_output() if suppress_output else nullcontext()
+        with ctx:
+            for _ in range(times):
+                func()
+
+        self.logger.debug("Warmup complete.")
+
+    def measure_time(
+        self,
+        func: Callable[[], Any] | None,
+        warmup_times: int = 3,
+        run_times: int = 5,
+        repeat_times: int = 1,
+        suppress_output: bool = True,
+    ) -> float:
         """
-        Paste text from Termux clipboard.
+        Measure average execution time of a function.
+
+        Runs the function multiple times and returns the average execution time.
+        Useful for performance testing and optimization.
+
+        Args:
+            func: Callable function to measure (must take no arguments)
+            run_times: Number of times to run for averaging (default: 5)
 
         Returns:
-            String content from clipboard.
+            Average execution time in seconds (float)
 
         Raises:
-            ClipboardError: If termux-clipboard-get command fails.
+            ValueError: If run_times is less than 1
+            InvalidFunctionError: If func is not callable
+            BenchmarkError: If function execution fails
 
         Example:
-            >>> text = ClipboardUtil.paste()
+            >>> bench = Benchmark()
+            >>> def expensive_operation():
+            ...     result = 0
+            ...     for i in range(1000000):
+            ...         result += i
+            ...     return result
+            >>> 
+            >>> # Measure with default 5 runs
+            >>> time_taken = bench.measure_time(expensive_operation)
+            [INFO] Average execution time: 0.0456 seconds
+            >>> 
+            >>> # Measure with 10 runs for better accuracy
+            >>> time_taken = bench.measure_time(expensive_operation, run_times=10)
+            [INFO] Average execution time: 0.0449 seconds
         """
-        try:
-            result = subprocess.run(
-                ["termux-clipboard-get"],
-                capture_output=True,
-                text=True,
-                check=True
+        # Validate inputs
+        if run_times < 1:
+            raise ValueError(f"run_times must be at least 1, got {run_times}")
+        if repeat_times < 1:
+            raise ValueError(
+                f"repeat_times must be at least 1, got {repeat_times}")
+
+        if not callable(func):
+            raise InvalidFunctionError(
+                f"Expected callable function, got {type(func).__name__}"
             )
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            raise ClipboardError(
-                "Failed to paste from clipboard. Is termux-api installed?"
-            ) from e
-        except FileNotFoundError as e:
-            raise ClipboardError(
-                "termux-clipboard-get not found. Install termux-api package."
-            ) from e
 
+        try:
 
-# ============================================================================
-# MAIN UTILITY CLASS (BACKWARDS COMPATIBILITY)
-# ============================================================================
+            # Warm up the function
+            self._warmup(
+                func, times=warmup_times, suppress_output=suppress_output)
 
-class Utility:
-    """
-    **LEGACY WRAPPER - For backwards compatibility with existing code.**
+            self.logger.debug(f"Running benchmark {run_times} times...")
 
-    This class maintains the original API while delegating to new specialized classes.
+            # Use timeit for accurate timing
 
-    **DEPRECATION WARNING:**
-    This class exists for backwards compatibility. New code should use:
-    - Logger() instead of Utility() for logging
-    - FileHandler() for file operations
-    - ScreenUtil() for screen operations
-    - DateTimeUtil() for datetime operations
-    - ClipboardUtil() for clipboard operations
+            ctx = self._suppress_output() if suppress_output else nullcontext()
+            with ctx:
+                times = timeit.repeat(
+                    func, number=run_times, repeat=repeat_times)
 
-    This wrapper will be removed in version 2.0.0.
+            average_time = min(times) / run_times
 
-    Example (OLD WAY - Still works):
-        >>> util = Utility()
-        >>> util.info("Processing...")
-        >>> util.save_json(data, "output.json")
+            self.logger.debug(
+                f"Average execution time: {average_time:.4f} seconds")
 
-    Example (NEW WAY - Recommended):
-        >>> logger = Logger()
-        >>> file_handler = FileHandler(logger=logger)
-        >>> logger.info("Processing...")
-        >>> file_handler.save_json(data, "output.json")
-    """
+            return average_time
 
-    def __init__(self, level: int = logging.WARNING) -> None:
-        """
-        Initialize Utility (legacy mode).
+        except InvalidFunctionError:
+            # Re-raise our custom exception
+            raise
 
-        Args:
-            level: Logging level (logging.INFO, logging.DEBUG, etc.).
-        """
-        # Predefined text messages (legacy)
-        self.text: Dict[str, str] = {
-            "ERROR": "\nOops! Something went wrong.",
-            "END": "\n[Program finished]",
-            "MISSING_FILE": "\nFile path not found.",
-        }
-
-        # Initialize new modular components
-        self.logger = Logger(level=level)
-        self._file_handler = FileHandler(logger=self.logger)
-        self._screen_util = ScreenUtil()
-        self._datetime_util = DateTimeUtil()
-        self._clipboard_util = ClipboardUtil()
-
-        # Expose logger's logger for backwards compatibility
-        self.logger_instance = self.logger.logger
-
-    # -------- Error handling methods (DEPRECATED) --------
-
-    def handle_error(self, exc: Exception) -> None:
-        """
-        **DEPRECATED:** Use try/except with custom exceptions instead.
-
-        Legacy error handler that prints error and exits.
-        """
-        import warnings
-        warnings.warn(
-            "handle_error() is deprecated and will be removed in v2.0 "
-            "Use try/except with custom exceptions instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        print(self.text["ERROR"])
-        self.debug(exc)
-        sys.exit(1)
-
-    def handle_file_not_found(self, fnf: FileNotFoundError) -> None:
-        """
-        **DEPRECATED:** Use try/except with FileNotFoundError instead.
-
-        Legacy file not found handler that prints error and exits.
-        """
-        import warnings
-        warnings.warn(
-            "handle_file_not_found() is deprecated and will be removed in v2.0 "
-            "Use try/except with FileNotFoundError instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        print(self.text["MISSING_FILE"])
-        self.debug(fnf)
-        sys.exit(1)
-    # -------- Logging methods (DELEGATES to Logger) --------
-
-    def info(self, message: Any) -> None:
-        """Log informational message."""
-        self.logger.info(message)
-
-    def debug(self, message: Any) -> None:
-        """Log debug message."""
-        self.logger.debug(message)
-
-    def warning(self, message: Any) -> None:
-        """Log warning message."""
-        self.logger.warning(message)
-
-    def error(self, message: Any) -> None:
-        """Log error message."""
-        self.logger.error(message)
-
-    # -------- UI/UX methods (DELEGATES to ScreenUtil) --------
-
-    def clear_screen(self, timeout: float = 0) -> None:
-        """Clear terminal screen."""
-        self._screen_util.clear_screen(timeout)
-
-    def clear_line(self, n: int = 1, timeout: float = 0.5) -> None:
-        """Clear N previous lines."""
-        self._screen_util.clear_line(n, timeout)
-
-    def animate(
-        self, r: int = 2, text: str = 'Signing in', sec: float = 0.5
-    ) -> None:
-        """
-        Display loading animation.
-
-        Note: Parameter 'r' renamed to 'cycles' in new API.
-        """
-        self._screen_util.animate(text=text, cycles=r, delay=sec)
-
-    def format_text(self, text: str, width: int = 70) -> str:
-        """Wrap text to specified width."""
-        return self._screen_util.format_text(text, width)
-
-    # -------- File handling methods (DELEGATES to FileHandler) --------
-
-    def ensure_writable_path(self, path: PathLike) -> Path:
-        """Ensure path is writable."""
-        return self._file_handler.ensure_writable_path(path)
-
-    def ensure_readable_file(self, path: PathLike) -> Path:
-        """Ensure file exists and is readable."""
-        return self._file_handler.ensure_readable_file(path)
-
-    def save_json(
-        self, data: JsonFormat, path: PathLike, operation: str = "w"
-    ) -> None:
-        """Save dictionary to JSON file."""
-        self._file_handler.save_json(data, path, mode=operation)
-
-    def read_json(self, path: PathLike) -> JsonFormat:
-        """Read JSON file."""
-        return self._file_handler.read_json(path)
-
-    def save_txt(
-        self, data: str, path: PathLike, operation: str = "w"
-    ) -> None:
-        """Save string to text file."""
-        self._file_handler.save_txt(data, path, mode=operation)
-
-    def read_txt(self, path: PathLike) -> str:
-        """Read text file."""
-        return self._file_handler.read_txt(path)
-
-    # -------- Datetime methods (DELEGATES to DateTimeUtil) --------
-
-    def get_current_time(
-        self, utc_offset_hours: int = 0, only_date: bool = True
-    ) -> str:
-        """Get current time with UTC offset."""
-        return self._datetime_util.get_current_time(utc_offset_hours, only_date)
-
-    # -------- Clipboard methods (DELEGATES to ClipboardUtil) --------
-
-    def copy(self, text: str) -> None:
-        """Copy text to Termux clipboard."""
-        self._clipboard_util.copy(text)
-
-    def paste(self) -> str:
-        """Paste text from Termux clipboard."""
-        return self._clipboard_util.paste()
+        except Exception as e:
+            error_msg = f"Failed to benchmark function: {e!s}"
+            self.logger.error(error_msg)
+            raise BenchmarkError(error_msg) from e

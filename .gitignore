@@ -207,6 +207,7 @@ marimo/_lsp/
 __marimo__/
 
 
-# Commit Files
+
+# Commit and Diff Files
 *.diff
-COMMIT*
+*[cC][oO][mM][mM][iI][tT]*
