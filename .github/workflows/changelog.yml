@@ -19,7 +19,7 @@ jobs:
           VERSION="${GITHUB_REF#refs/tags/}"
           VERSION_NUM="${VERSION#v}"
 
-          if ! grep -qE "^\[v?${VERSION_NUM}\]" CHANGELOG.md; then
+          if ! grep -qE "^##\s+\[v?${VERSION_NUM}\]" CHANGELOG.md; then
             echo "No changelog entry found for $VERSION in CHANGELOG.md"
             echo "Please add a [${VERSION}] section to CHANGELOG.md before tagging."
             exit 1
