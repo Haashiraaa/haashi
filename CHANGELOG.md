@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Changed
+- `release.yml` and `changelog.yml` now verify the tagged commit is an
+  ancestor of `main` before proceeding, so tagging a branch other than
+  `main` no longer creates a GitHub Release or triggers a PyPI publish.
+- `publish.yml` now also gets triggered explicitly via `gh workflow run`
+  from `release.yml`, since the default `GITHUB_TOKEN` doesn't propagate
+  the `release: published` event needed to fire it automatically.
+
+---
+
 ## [v1.8.1] - 2026-08-19 - Deprecation Notice
 
 ### Changed
