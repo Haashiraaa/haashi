@@ -13,17 +13,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor ${{ github.sha }} origin/main; then
+            echo "Γ¥î Tag ${{ github.ref_name }} is not on main. Skipping release."
+            exit 1
+          fi
+          echo "Γ£à Tag is on main, proceeding."
 
       - name: Check changelog entry exists
         run: |
           VERSION="${GITHUB_REF#refs/tags/}"
           VERSION_NUM="${VERSION#v}"
 
-          if ! grep -qE "^\[v?${VERSION_NUM}\]" CHANGELOG.md; then
+          if ! grep -qE "^##\s+\[v?${VERSION_NUM}\]" CHANGELOG.md; then
             echo "No changelog entry found for $VERSION in CHANGELOG.md"
             echo "Please add a [${VERSION}] section to CHANGELOG.md before tagging."
             exit 1
           fi
 
           echo "Changelog entry found for $VERSION"
+
 

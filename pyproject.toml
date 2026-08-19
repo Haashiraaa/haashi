@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "haashi"
-version = "2.0.0"
+dynamic = ["version"] # ... version = "2.0.0" line removed entirely
 description = "A modular Python toolkit for reusable utilities."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Haashiraaa"}
+    {name = "Haashiraaa", email = "terryfregene.dev@gmail.com"}
+]
+maintainers = [
+    {name = "Haashiraaa", email = "terryfregene.dev@gmail.com"}
 ]
 keywords = [  
     "utilities",
@@ -34,11 +37,11 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "ruff>=0.1.0",
-    "pyright",
-    "autopep8"
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.3",
+    "pyright>=1.1.411",
+    "autopep8>=2.3.2",
 ]
 
 [tool.setuptools]
@@ -48,6 +51,10 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.dynamic]
+# Version is read from haashi.__version__ (src/haashi/__init__.py).
+# Do NOT add a static `version = "..."` under [project] above — setuptools
+# will error if both are present. To bump the version, edit __version__
+# in src/haashi/__init__.py only; this file doesn't need touching.
 version = {attr = "haashi.__version__"}
 
 
