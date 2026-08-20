@@ -9,17 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v2.0.1] - 2026-08-20 - Docs & Packaging Fixes
-
-### Changed
-- Rewrote README.md for the haashi rename (was still describing haashi_pkg 1.0.0).
-- Synced LICENSE copyright to Haashiraaa / 2025-2026.
-
-### Added
-- py.typed marker for PEP 561 compliance.
-
----
-
 ## [Unreleased]
 
 ### Changed
@@ -29,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `publish.yml` now also gets triggered explicitly via `gh workflow run`
   from `release.yml`, since the default `GITHUB_TOKEN` doesn't propagate
   the `release: published` event needed to fire it automatically.
+
+---
+
+## [v2.0.1] - 2026-08-20 - Docs & Packaging Fixes
+
+### Changed
+- Rewrote README.md for the haashi rename (was still describing haashi_pkg 1.0.0).
+- Synced LICENSE copyright to Haashiraaa / 2025-2026.
+
+### Added
+- py.typed marker for PEP 561 compliance.
 
 ---
 
