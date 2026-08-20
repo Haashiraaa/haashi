@@ -50,6 +50,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+haashi = ["py.typed"]
+
 [tool.setuptools.dynamic]
 # Version is read from haashi.__version__ (src/haashi/__init__.py).
 # Do NOT add a static `version = "..."` under [project] above — setuptools
