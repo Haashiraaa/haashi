@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "haashi"
+dynamic = ["version"]
+description = "A lightweight, dependency-free Python utility toolkit: logging, file I/O, terminal helpers, datetime and benchmarking."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Haashiraaa", email = "terryfregene.dev@gmail.com"}
+]
+maintainers = [
+    {name = "Haashiraaa", email = "terryfregene.dev@gmail.com"}
+]
+keywords = ["utilities", "logging", "benchmarking", "toolkit"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+
+# Zero runtime dependencies - this is a headline feature. Keep it that way.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.3",
+    "pyright>=1.1.411",
+    "autopep8>=2.3.2",
+    "build>=1.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Haashiraaa/haashi"
+Repository = "https://github.com/Haashiraaa/haashi"
+Documentation = "https://github.com/Haashiraaa/haashi/blob/main/README.md"
+Issues = "https://github.com/Haashiraaa/haashi/issues"
+Changelog = "https://github.com/Haashiraaa/haashi/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["haashi", "haashi.*"]
+
+[tool.setuptools.package-data]
+haashi = ["py.typed"]
+
+[tool.setuptools.dynamic]
+# Read statically from src/haashi/__init__.py. To bump the version edit
+# __version__ there (keep it a plain string literal) and nowhere else.
+version = {attr = "haashi.__version__"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+include = ["src", "tests"]
+strict = ["src"]
+pythonVersion = "3.10"

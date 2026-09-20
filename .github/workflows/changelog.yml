@@ -1,0 +1,34 @@
+name: Validate Changelog
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "Tag ${GITHUB_REF_NAME} is not on main."
+            exit 1
+          fi
+          echo "Tag is on main, proceeding."
+
+      - name: Check changelog entry exists
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION_NUM="${VERSION#v}"
+
+          if ! grep -qE "^##\s+\[v?${VERSION_NUM}\]" CHANGELOG.md; then
+            echo "No changelog entry found for ${VERSION} in CHANGELOG.md"
+            echo "Add a [${VERSION_NUM}] section to CHANGELOG.md before tagging."
+            exit 1
+          fi
+
+          echo "Changelog entry found for ${VERSION}"

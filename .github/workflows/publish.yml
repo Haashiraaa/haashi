@@ -1,0 +1,51 @@
+name: Publish to PyPI
+
+# Publishing has exactly one entry point: release.yml dispatches this workflow
+# after it creates the GitHub Release. (There is deliberately no
+# `release: published` trigger, which would publish a second time.)
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write   # PyPI Trusted Publishing (OIDC) - no API token needed
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Build package
+        run: |
+          pip install build
+          python -m build
+
+      - name: Verify the built version matches the tag
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          VERSION_NUM="${TAG#v}"
+          if [ ! -f "dist/haashi-${VERSION_NUM}-py3-none-any.whl" ]; then
+            echo "Tag ${TAG} does not match the built version:"
+            ls dist
+            echo "Bump __version__ in src/haashi/__init__.py before tagging."
+            exit 1
+          fi
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

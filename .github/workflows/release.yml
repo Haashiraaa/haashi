@@ -1,0 +1,98 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "Tag ${GITHUB_REF_NAME} is not on main. Skipping release."
+            exit 1
+          fi
+          echo "Tag is on main, proceeding."
+
+      - name: Get tag version
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "VERSION=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog section and title
+        id: extract
+        env:
+          VERSION: ${{ steps.tag.outputs.VERSION }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+
+          version = os.environ["VERSION"].removeprefix("v")
+          with open("CHANGELOG.md", encoding="utf-8") as f:
+              content = f.read()
+
+          # "## [1.0.0] - 2026-09-19 - Some Title"  (hyphen, en dash or em dash)
+          header = re.search(rf"(?m)^##\s+\[v?{re.escape(version)}\][^\n]*", content)
+          title = version
+          if header:
+              m = re.search(r"\d{4}-\d{2}-\d{2}\s*[-\u2013\u2014]\s*(.+)", header.group(0))
+              if m:
+                  title = f"{version} \u2014 {m.group(1).strip()}"
+
+          # Body runs until the next "## " heading ("### " subsections don't match).
+          body_match = re.search(
+              rf"(?ms)^##\s+\[v?{re.escape(version)}\][^\n]*\n(.*?)(?=^##\s|\Z)", content
+          )
+          if body_match:
+              body = re.sub(r"\n-{3,}\s*$", "", body_match.group(1).strip()).strip()
+          else:
+              body = "See [CHANGELOG.md](./CHANGELOG.md) for full details."
+
+          with open("release_body.md", "w", encoding="utf-8") as f:
+              f.write(f"## {title}\n\n{body}\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"RELEASE_TITLE={title}\n")
+          print(open("release_body.md", encoding="utf-8").read())
+          PY
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.VERSION }}
+          name: ${{ steps.extract.outputs.RELEASE_TITLE }}
+          body_path: release_body.md
+          generate_release_notes: false
+
+      # The default GITHUB_TOKEN doesn't propagate `release: published` events,
+      # so publishing is dispatched explicitly.
+      - name: Trigger PyPI publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.tag.outputs.VERSION }}
+        run: |
+          gh workflow run publish.yml --ref "${VERSION}" -f tag="${VERSION}"
