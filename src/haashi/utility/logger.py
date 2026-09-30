@@ -9,12 +9,14 @@ import json
 import logging
 import os
 import sys
+import threading
 import traceback
 import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar, TextIO, cast
 
+from ._atomic import atomic_write_text
 from ._datetime import DateTime
 from ._paths import detect_script_dir
 from ._types import JSONType, PathLike
@@ -24,6 +26,10 @@ from .uiux import Colors
 DEFAULT_ERROR_LOG_PATH = Path("logs/errors_log.json")
 
 _logger_ids = itertools.count()  # unique per Logger, never reused (unlike id())
+
+# Serializes read-modify-write cycles on error-log files across threads.
+# (Multiple *processes* writing one file still need external coordination.)
+_LOG_LOCK = threading.RLock()
 
 
 def _color_enabled(stream: TextIO, color: bool | None) -> bool:
@@ -96,16 +102,21 @@ class ErrorLogger:
             with open(path, encoding="utf-8") as f:
                 entries = json.load(f)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            backup = path.with_name(path.name + ".corrupt")
+            path.replace(backup)
             warnings.warn(
-                f"Corrupted error log at {path} ({exc}); starting a fresh log. "
-                f"The old file is overwritten on the next write.",
+                f"Corrupted error log at {path} ({exc}); moved it to {backup} "
+                f"and starting a fresh log.",
                 RuntimeWarning,
                 stacklevel=3,
             )
             return []
         if not isinstance(entries, list):
+            backup = path.with_name(path.name + ".corrupt")
+            path.replace(backup)
             warnings.warn(
-                f"Error log at {path} is not a JSON list; starting a fresh log.",
+                f"Error log at {path} is not a JSON list; moved it to {backup} "
+                f"and starting a fresh log.",
                 RuntimeWarning,
                 stacklevel=3,
             )
@@ -115,8 +126,7 @@ class ErrorLogger:
     @staticmethod
     def _write_error_entries(entries: list[JSONType], path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(entries, indent=4, default=str),
-                        encoding="utf-8")
+        atomic_write_text(path, json.dumps(entries, indent=4, default=str))
 
     @staticmethod
     def _traceback_string(exception: BaseException) -> str:
@@ -149,7 +159,6 @@ class ErrorLogger:
             raise ValueError(f"max_entries must be at least 1, got {max_entries}")
 
         error_path = self._resolve_path(path, use_script_dir)
-        entries = self._read_error_entries(error_path)
 
         entry: dict[str, JSONType] = {
             "timestamp": DateTime.get_current_time(
@@ -159,8 +168,10 @@ class ErrorLogger:
             "context": context or "unspecified",
             "traceback": self._traceback_string(exception),
         }
-        entries.append(entry)
-        self._write_error_entries(entries[-max_entries:], error_path)
+        with _LOG_LOCK:
+            entries = self._read_error_entries(error_path)
+            entries.append(entry)
+            self._write_error_entries(entries[-max_entries:], error_path)
         return error_path
 
     def view_error_entries(
@@ -172,8 +183,9 @@ class ErrorLogger:
         """Return the most recent ``limit`` entries (``None`` for all)."""
         if limit is not None and limit < 1:
             raise ValueError(f"limit must be at least 1 or None, got {limit}")
-        entries = self._read_error_entries(
-            self._resolve_path(path, use_script_dir))
+        with _LOG_LOCK:
+            entries = self._read_error_entries(
+                self._resolve_path(path, use_script_dir))
         return entries if limit is None else entries[-limit:]
 
     def clear_errors(
@@ -207,7 +219,8 @@ class ErrorLogger:
             if answer.strip().lower() not in {"y", "yes"}:
                 return False
 
-        error_path.unlink()
+        with _LOG_LOCK:
+            error_path.unlink(missing_ok=True)
         return True
 
 
@@ -237,8 +250,10 @@ class Logger:
             color: ``None`` (default) colors output only on a terminal;
                 ``True`` / ``False`` force colors on / off.
         """
-        self.logger = logging.getLogger(f"haashi.{next(_logger_ids)}")
-        self.logger.setLevel(level)
+        # Instantiated directly instead of via logging.getLogger(): getLogger
+        # registers the logger in a global dict that is never cleaned up, so
+        # creating Loggers repeatedly (e.g. per request) would leak forever.
+        self.logger = logging.Logger(f"haashi.{next(_logger_ids)}", level)
         self.logger.propagate = False
 
         handler = logging.StreamHandler()

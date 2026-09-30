@@ -9,6 +9,7 @@ MODULES = [
     "haashi",
     "haashi.utility",
     "haashi.utility._paths",
+    "haashi.utility._atomic",
     "haashi.utility._types",
     "haashi.utility._datetime",
     "haashi.utility.exceptions",

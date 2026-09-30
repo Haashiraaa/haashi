@@ -8,6 +8,7 @@ import inspect
 import json
 from pathlib import Path
 
+from ._atomic import atomic_write_text
 from ._paths import detect_script_dir
 from ._types import JSONType, PathLike, dump_json
 from .exceptions import FileOperationError
@@ -153,7 +154,7 @@ class FileHandler:
         payload = dump_json(data, indent=indent)  # validate before touching disk
         file_path = self.ensure_writable_path(path)
         try:
-            file_path.write_text(payload, encoding="utf-8")
+            atomic_write_text(file_path, payload)
         except OSError as exc:
             raise FileOperationError(
                 f"Failed to save JSON to {file_path}: {exc}") from exc
@@ -201,10 +202,13 @@ class FileHandler:
             raise ValueError(f"mode must be 'w' or 'a', got {mode!r}")
         file_path = self.ensure_writable_path(path)
         try:
-            with open(file_path, mode, encoding="utf-8") as f:
-                if add_newline_prefix:
-                    f.write("\n")
-                f.write(data)
+            if mode == "w":
+                atomic_write_text(file_path, ("\n" if add_newline_prefix else "") + data)
+            else:
+                with open(file_path, "a", encoding="utf-8") as f:
+                    if add_newline_prefix:
+                        f.write("\n")
+                    f.write(data)
         except OSError as exc:
             raise FileOperationError(
                 f"Failed to save TXT to {file_path}: {exc}") from exc

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-30 - Backend Safety
+
+### Fixed
+- `ErrorLogger` is now thread-safe: concurrent `log_error` calls no longer lose entries or corrupt the log.
+- `FileHandler.save_json` / `save_txt(mode="w")` and the error log are written atomically, so a crash mid-write can't leave a truncated file.
+- `Logger` no longer leaks into the global logging registry, so creating one per request is safe.
+- A corrupted error log is moved to `<name>.corrupt` instead of being overwritten.
+
+
 ## [1.0.0] - 2026-09-20 - Initial Release
 
 ### Added
