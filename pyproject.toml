@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "haashi"
 dynamic = ["version"]
-description = "A lightweight, dependency-free Python utility toolkit: logging, file I/O, terminal helpers, datetime and benchmarking."
+description = "A lightweight, dependency-free Python utility toolkit: logging, file I/O, terminal helpers, datetime and benchmarking, with a matching async API." 
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
