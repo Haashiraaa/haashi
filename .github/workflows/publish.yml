@@ -1,4 +1,3 @@
-
 name: Publish to PyPI
 
 # Publishing has exactly one entry point: release.yml dispatches this workflow
@@ -15,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  # NEW: runs first
+  # Gate: lint, type check and test before anything is built or uploaded.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -33,9 +32,8 @@ jobs:
       - name: Lint, type check, test
         run: ruff check . && pyright && pytest
 
-  # EXISTING: only change is the `needs: check` line
   publish:
-    needs: check                 # <-- NEW LINE
+    needs: check
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

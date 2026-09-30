@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.2.0] - 2026-10-01 - Logger.critical & Documentation
+
+### Added
+- `Logger.critical()`: log fatal-level messages. Takes the same arguments as
+  `Logger.error()` (including `exception`, `save_to_json`, `context`) and is
+  styled like errors. Also available from `haashi.aio`, which re-exports `Logger`.
+- `docs/DOCUMENTATION.md`: full user guide and reference covering every class,
+  path-resolution rules, atomic writes, thread-safety, the async API, recipes
+  (CLI, FastAPI, AWS Lambda, Docker, tests), troubleshooting and an API cheat sheet.
+
+### Changed
+- README rewritten to match the code exactly: documents atomic writes,
+  thread-safety, `log_dir`, corrupt-log quarantine (`<name>.corrupt`), the
+  installed-location fallback for script-relative paths, the full package layout
+  and the real `dev` extras. It now warns that `Benchmark(suppress_output=True)`
+  is process-wide and shows how to run on read-only filesystems such as AWS Lambda.
+- `Logger.error()` and `Logger.critical()` share one implementation.
+- Release workflows: `release.yml` and `changelog.yml` now use the same
+  changelog-heading check (`[1.2.0]` and `[v1.2.0]` are both accepted), and
+  leftover editing notes were removed from `publish.yml`.
+
+### Fixed
+- The 1.0.0 changelog entry now says CI covers Python 3.10-3.14, matching the
+  CI matrix and package classifiers.
+- Removed a redundant `return` in script-directory detection.
+
+
 ## [1.1.0] - 2026-09-30 - Backend & Async Support
 
 ### Added
@@ -54,4 +81,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero runtime dependencies, full type hints, and a `py.typed` marker
   (PEP 561).
 - Test suite, and CI covering ruff, pyright (strict) and pytest on
-  Python 3.10-3.13, plus a build-and-install smoke test.
+  Python 3.10-3.14, plus a build-and-install smoke test.

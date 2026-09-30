@@ -357,3 +357,47 @@ def test_logger_uses_default_error_logger_and_call_can_override(tmp_path: Path) 
 
     assert (tmp_path / "default" / "errors_log.json").exists()
     assert (tmp_path / "other" / "errors_log.json").exists()
+
+
+# ---- critical -----------------------------------------------------------------
+
+def test_critical_logs_at_critical_level_styled_like_errors(
+    capsys: pytest.CaptureFixture[str]
+) -> None:
+    Logger(logging.DEBUG, color=True).critical("meltdown")
+    assert capsys.readouterr().err == Colors.error("[CRITICAL] meltdown") + "\n"
+
+
+def test_critical_is_plain_when_not_a_terminal(capsys: pytest.CaptureFixture[str]) -> None:
+    Logger().critical("meltdown")
+    assert capsys.readouterr().err == "[CRITICAL] meltdown\n"
+
+
+def test_critical_shows_even_at_the_highest_level(capsys: pytest.CaptureFixture[str]) -> None:
+    Logger(logging.CRITICAL).error("hidden")
+    Logger(logging.CRITICAL).critical("shown")
+    err = capsys.readouterr().err
+    assert "hidden" not in err and "shown" in err
+
+
+def test_critical_persists_when_asked(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = tmp_path / "c.json"
+    Logger().critical(
+        "fatal", exception=boom(), save_to_json=True, path=log,
+        use_script_dir=False, context="boot")
+    assert json.loads(log.read_text())[0]["context"] == "boot"
+    err = capsys.readouterr().err
+    assert "[CRITICAL] fatal" in err and str(log) in err
+
+
+def test_critical_save_requires_exception() -> None:
+    with pytest.raises(LoggingError):
+        Logger().critical("oops", save_to_json=True)
+
+
+def test_critical_uses_the_loggers_default_error_logger(tmp_path: Path) -> None:
+    lg = Logger(error_logger=ErrorLogger(log_dir=tmp_path))
+    lg.critical("x", exception=boom(), save_to_json=True)
+    assert (tmp_path / "errors_log.json").exists()

@@ -329,6 +329,28 @@ class Logger:
         return writer.log_error(
             exception, context=context, path=path, use_script_dir=use_script_dir)
 
+    def _log_persisted(
+        self,
+        emit: Callable[[str], None],
+        message: Any,
+        error_logger: ErrorLogger | None,
+        path: PathLike | None,
+        exception: BaseException | None,
+        save_to_json: bool,
+        use_script_dir: bool,
+        context: str | None,
+    ) -> None:
+        """Shared body of ``error`` and ``critical``."""
+        text = str(message)
+        if save_to_json:
+            if exception is None:
+                raise LoggingError(
+                    "save_to_json=True requires an `exception` argument")
+            saved_to = self._persist(
+                exception, error_logger, path, use_script_dir, context)
+            text = f"{text}\nSee {saved_to} for details"
+        emit(text)
+
     def error(
         self,
         message: Any = "Error occurred!",
@@ -354,15 +376,40 @@ class Logger:
         Raises:
             LoggingError: If ``save_to_json=True`` without an ``exception``.
         """
-        text = str(message)
-        if save_to_json:
-            if exception is None:
-                raise LoggingError(
-                    "save_to_json=True requires an `exception` argument")
-            saved_to = self._persist(
-                exception, error_logger, path, use_script_dir, context)
-            text = f"{text}\nSee {saved_to} for details"
-        self.logger.error(text)
+        self._log_persisted(
+            self.logger.error, message, error_logger, path, exception,
+            save_to_json, use_script_dir, context)
+
+    def critical(
+        self,
+        message: Any = "Critical error!",
+        error_logger: ErrorLogger | None = None,
+        path: PathLike | None = None,
+        exception: BaseException | None = None,
+        save_to_json: bool = False,
+        use_script_dir: bool = True,
+        context: str | None = None,
+    ) -> None:
+        """Log a critical (fatal-level) message, optionally persisting to JSON.
+
+        Takes the same arguments as :meth:`error`. Use it for failures the
+        program cannot recover from (for example right before exiting).
+        Output is styled like errors.
+
+        Raises:
+            LoggingError: If ``save_to_json=True`` without an ``exception``.
+
+        Example:
+            >>> try:
+            ...     connect_to_database()
+            ... except ConnectionError as exc:
+            ...     logger.critical("Database unreachable", exception=exc,
+            ...                     save_to_json=True)
+            ...     raise SystemExit(1)
+        """
+        self._log_persisted(
+            self.logger.critical, message, error_logger, path, exception,
+            save_to_json, use_script_dir, context)
 
     def exception(
         self,

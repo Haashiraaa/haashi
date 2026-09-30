@@ -49,7 +49,6 @@ def detect_script_dir(logger: Logger | None = None) -> Path:
             logger.debug(
                 f"Main script is in an installed location ({script_dir}); "
                 "using current directory")
-            return Path.cwd()
         return Path.cwd()
 
     if logger is not None:
