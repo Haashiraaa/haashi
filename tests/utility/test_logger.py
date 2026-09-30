@@ -302,3 +302,43 @@ def test_exception_traceback_is_colored_as_error(capsys: pytest.CaptureFixture[s
 def test_each_logger_gets_a_distinct_underlying_logger() -> None:
     names = {Logger().logger.name for _ in range(5)}
     assert len(names) == 5
+
+
+# ---- log_dir / default error_logger (backend use) -----------------------------
+
+def test_log_dir_receives_the_default_file(tmp_path: Path) -> None:
+    el = ErrorLogger(log_dir=tmp_path / "svc")
+    saved = el.log_error(boom())
+    assert saved == tmp_path / "svc" / "errors_log.json"
+    assert len(el.view_error_entries()) == 1
+    assert el.clear_errors(confirm=False) is True
+
+
+def test_log_dir_wins_over_use_script_dir(tmp_path: Path) -> None:
+    el = ErrorLogger(log_dir=tmp_path)
+    saved = el.log_error(boom(), path="sub/e.json", use_script_dir=True)
+    assert saved == tmp_path / "sub" / "e.json"
+
+
+def test_absolute_path_beats_log_dir(tmp_path: Path) -> None:
+    target = tmp_path / "elsewhere" / "e.json"
+    saved = ErrorLogger(log_dir=tmp_path / "svc").log_error(boom(), path=target)
+    assert saved == target and target.exists()
+    assert not (tmp_path / "svc").exists()
+
+
+def test_log_dir_expands_user(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert ErrorLogger(log_dir="~/logs").log_dir == tmp_path / "logs"
+
+
+def test_logger_uses_default_error_logger_and_call_can_override(tmp_path: Path) -> None:
+    default = ErrorLogger(log_dir=tmp_path / "default")
+    other = ErrorLogger(log_dir=tmp_path / "other")
+    lg = Logger(error_logger=default)
+
+    lg.error("a", exception=boom(), save_to_json=True)
+    lg.error("b", exception=boom(), save_to_json=True, error_logger=other)
+
+    assert (tmp_path / "default" / "errors_log.json").exists()
+    assert (tmp_path / "other" / "errors_log.json").exists()

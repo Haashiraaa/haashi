@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Added
+- `haashi.aio`: async twins of `FileHandler`, `ErrorLogger` and `Benchmark` with
+  the same class and method names. Disk IO runs in a worker thread
+  (`asyncio.to_thread`), so it never blocks the event loop; no new dependencies.
+  `Logger`, `DateTime`, `Colors` and all exceptions are re-exported unchanged.
+  Importing `haashi` does not import `asyncio`; the cost is opt-in.
+- `ErrorLogger(log_dir=...)`: choose the directory error logs are written to
+  (relative paths resolve under it; absolute paths still win). Intended for
+  servers, where "the script's directory" is the server's entry point.
+- `Logger(error_logger=...)`: default `ErrorLogger` used by `save_to_json=True`.
+
+### Fixed
+- `ErrorLogger` is now thread-safe: concurrent `log_error` calls no longer lose
+  entries or corrupt the log.
+- JSON/TXT writes and the error log are written atomically, so a crash
+  mid-write cannot leave a truncated file.
+- `Logger` no longer leaks into the global logging registry, so creating one
+  per request is safe.
+- A corrupted error log is moved to `<name>.corrupt` instead of being
+  overwritten.
+
+
 ## [1.0.1] - 2026-09-30 - Backend Safety
 
 ### Fixed
@@ -14,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FileHandler.save_json` / `save_txt(mode="w")` and the error log are written atomically, so a crash mid-write can't leave a truncated file.
 - `Logger` no longer leaks into the global logging registry, so creating one per request is safe.
 - A corrupted error log is moved to `<name>.corrupt` instead of being overwritten.
+
 
 
 ## [1.0.0] - 2026-09-20 - Initial Release

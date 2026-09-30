@@ -23,7 +23,8 @@ from ._types import JSONType, PathLike
 from .exceptions import LoggingError
 from .uiux import Colors
 
-DEFAULT_ERROR_LOG_PATH = Path("logs/errors_log.json")
+DEFAULT_ERROR_LOG_FILENAME = "errors_log.json"
+DEFAULT_ERROR_LOG_PATH = Path("logs") / DEFAULT_ERROR_LOG_FILENAME
 
 _logger_ids = itertools.count()  # unique per Logger, never reused (unlike id())
 
@@ -79,8 +80,18 @@ class ErrorLogger:
     the same way, so what ``log_error`` writes is what ``view_error_entries``
     and ``clear_errors`` read.
 
+    Where the file lives:
+        * ``log_dir`` set: relative paths (and the default file name) resolve
+          under it. Use this for servers and services, where "the script's
+          directory" is the server's entry point, not your app.
+        * ``log_dir`` not set: relative paths resolve next to the running
+          script (``use_script_dir=True``, the default) or the current
+          directory (``use_script_dir=False``).
+        * An absolute ``path`` is always used as given.
+
     Example:
-        >>> error_logger = ErrorLogger()
+        >>> error_logger = ErrorLogger()                       # CLI / scripts
+        >>> service_logger = ErrorLogger(log_dir="/var/log/myapp")   # backend
         >>> try:
         ...     1 / 0
         ... except ZeroDivisionError as exc:
@@ -88,9 +99,26 @@ class ErrorLogger:
         >>> error_logger.view_error_entries(limit=5)
     """
 
-    @staticmethod
-    def _resolve_path(path: PathLike | None, use_script_dir: bool) -> Path:
-        error_path = Path(path) if path is not None else DEFAULT_ERROR_LOG_PATH
+    def __init__(self, log_dir: PathLike | None = None) -> None:
+        """
+        Args:
+            log_dir: Directory that relative log paths resolve under. ``~``
+                is expanded. ``None`` keeps the script-relative behavior.
+        """
+        self.log_dir: Path | None = (
+            Path(log_dir).expanduser() if log_dir is not None else None)
+
+    def _resolve_path(self, path: PathLike | None, use_script_dir: bool) -> Path:
+        if path is not None:
+            error_path = Path(path)
+            if error_path.is_absolute():
+                return error_path
+            if self.log_dir is not None:
+                return self.log_dir / error_path
+        elif self.log_dir is not None:
+            return self.log_dir / DEFAULT_ERROR_LOG_FILENAME
+        else:
+            error_path = DEFAULT_ERROR_LOG_PATH
         return detect_script_dir() / error_path if use_script_dir else error_path
 
     @staticmethod
@@ -243,13 +271,23 @@ class Logger:
         ...     logger.error("risky() failed", exception=exc, save_to_json=True)
     """
 
-    def __init__(self, level: int = logging.WARNING, color: bool | None = None) -> None:
+    def __init__(
+        self,
+        level: int = logging.WARNING,
+        color: bool | None = None,
+        error_logger: ErrorLogger | None = None,
+    ) -> None:
         """
         Args:
             level: Logging level (logging.INFO, logging.DEBUG, ...).
             color: ``None`` (default) colors output only on a terminal;
                 ``True`` / ``False`` force colors on / off.
+            error_logger: Default ErrorLogger used whenever ``save_to_json``
+                is set, e.g. ``ErrorLogger(log_dir="/var/log/myapp")`` so a
+                service doesn't have to pass one on every call. A per-call
+                ``error_logger`` still overrides it.
         """
+        self.error_logger = error_logger
         # Instantiated directly instead of via logging.getLogger(): getLogger
         # registers the logger in a global dict that is never cleaned up, so
         # creating Loggers repeatedly (e.g. per request) would leak forever.
@@ -275,15 +313,18 @@ class Logger:
         """Log a warning."""
         self.logger.warning(str(message))
 
-    @staticmethod
     def _persist(
+        self,
         exception: BaseException,
         error_logger: ErrorLogger | None,
         path: PathLike | None,
         use_script_dir: bool,
         context: str | None,
     ) -> Path:
-        return (error_logger or ErrorLogger()).log_error(
+        writer = error_logger or self.error_logger
+        if writer is None:
+            writer = self.error_logger = ErrorLogger()
+        return writer.log_error(
             exception, context=context, path=path, use_script_dir=use_script_dir)
 
     def error(

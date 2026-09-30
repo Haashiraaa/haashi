@@ -54,13 +54,17 @@ For development: `pip install "haashi[dev]"` (pytest, ruff, pyright, build).
 
 ```
 haashi/
-└── utility/
-    ├── logger.py       # Logger, ErrorLogger
+├── utility/            # sync API (scripts, CLIs)
+│   ├── logger.py       # Logger, ErrorLogger
+│   ├── filehandler.py  # FileHandler
+│   ├── benchmark.py    # Benchmark
+│   ├── uiux.py         # ScreenUtil, Colors
+│   ├── _datetime.py    # DateTime
+│   └── exceptions.py   # UtilityError and subclasses
+└── aio/                # async API (FastAPI, aiohttp, asyncio) - same names
     ├── filehandler.py  # FileHandler
-    ├── benchmark.py    # Benchmark
-    ├── uiux.py         # ScreenUtil, Colors
-    ├── _datetime.py    # DateTime
-    └── exceptions.py   # UtilityError and subclasses
+    ├── errorlogger.py  # ErrorLogger
+    └── benchmark.py    # Benchmark
 ```
 
 ---
@@ -175,6 +179,68 @@ print(f"{seconds:.4f}s per call")
 ```
 
 Output from the function is suppressed while timing (`suppress_output=False` to keep it), and any logging state you had before is restored afterwards.
+
+---
+
+## Backend and async usage
+
+`haashi.aio` has the **same class and method names** as `haashi.utility`. The
+difference is that anything touching the disk is `await`-able and runs in a
+worker thread, so it never blocks your event loop. Nothing is added to the
+dependency list.
+
+```python
+# scripts / CLI (sync)
+from haashi.utility import FileHandler
+FileHandler().save_json(data, "x.json")
+```
+
+```python
+# FastAPI, aiohttp, asyncio (async): same names, just await
+from haashi.aio import FileHandler
+await FileHandler().save_json(data, "x.json")
+```
+
+```python
+from fastapi import FastAPI
+from haashi.aio import ErrorLogger, FileHandler, Logger
+
+app = FastAPI()
+logger = Logger()
+errors = ErrorLogger(log_dir="/var/log/myapp")     # you choose where logs live
+files = FileHandler()
+
+@app.post("/orders")
+async def create_order(order: dict):
+    try:
+        await files.save_json(order, "/data/orders/latest.json")
+    except Exception as exc:
+        await errors.log_error(exc, context="POST /orders")
+        raise
+```
+
+| Class | In `haashi.aio` | Notes |
+|---|---|---|
+| `FileHandler` | async `save_json`, `read_json`, `save_txt`, `read_txt`, `ensure_*` | Path helpers (`get_script_dir`, `get_parent_path`, `get_ancestor_by_name`) stay sync: no IO to await. |
+| `ErrorLogger` | async `log_error`, `view_error_entries`, `clear_errors` | Thread-safe. Pass `confirm=False` to `clear_errors` on servers. |
+| `Benchmark` | async `measure_time` for coroutine functions | `suppress_output` defaults to `False` (silencing output is process-wide). |
+| `Logger`, `DateTime`, `Colors`, exceptions | re-exported unchanged | Logging a line is fast; it needs no `await`. |
+
+**Choosing where error logs go.** By default `ErrorLogger` writes next to the
+running script. That is convenient for scripts but wrong for servers (under
+uvicorn/gunicorn "the script" is the server's own entry point). Pass `log_dir`:
+
+```python
+ErrorLogger(log_dir="/var/log/myapp")     # logs/errors go to /var/log/myapp/errors_log.json
+ErrorLogger(log_dir="~/myapp-logs")       # "~" is expanded
+Logger(error_logger=ErrorLogger(log_dir="/var/log/myapp"))   # default for save_to_json=True
+```
+
+Relative paths resolve under `log_dir`; an absolute `path` is always used as
+given. Files are written atomically and guarded by a lock, so many concurrent
+requests can log errors without losing entries. (Several *processes* writing
+one file, such as multiple gunicorn workers, need one `log_dir` per worker or an
+external log shipper.)
 
 ---
 

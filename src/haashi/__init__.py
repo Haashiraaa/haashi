@@ -11,6 +11,6 @@ from . import utility
 
 # Single source of truth for the version (read statically by setuptools).
 # Keep this a plain string literal.
-__version__ = "1.0.1"
+__version__ = "2.0.2"
 
 __all__ = ["utility"]
