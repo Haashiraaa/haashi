@@ -209,6 +209,7 @@ __marimo__/
 # Logs
 logs/
 
-# Commit and Diff Files
+# Commit and Diff Files (repo root only, so source files with "commit" in the name are safe)
 *.diff
-*[cC][oO][mM][mM][iI][tT]*
+/COMMIT*
+/*commit*.txt

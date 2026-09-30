@@ -77,7 +77,8 @@ class FileHandler:
             PosixPath('/home/user/my-project')
         """
         if levels_up < 0:
-            raise ValueError(f"levels_up must be non-negative, got {levels_up}")
+            raise ValueError(
+                f"levels_up must be non-negative, got {levels_up}")
 
         current = self._resolve_start_dir(start_path)
         for _ in range(levels_up):
@@ -151,7 +152,8 @@ class FileHandler:
                 (nothing is written in that case).
             FileOperationError: If the file can't be written.
         """
-        payload = dump_json(data, indent=indent)  # validate before touching disk
+        payload = dump_json(
+            data, indent=indent)  # validate before touching disk
         file_path = self.ensure_writable_path(path)
         try:
             atomic_write_text(file_path, payload)
@@ -172,7 +174,8 @@ class FileHandler:
             with open(file_path, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise FileOperationError(f"Invalid JSON in {file_path}: {exc}") from exc
+            raise FileOperationError(
+                f"Invalid JSON in {file_path}: {exc}") from exc
         except OSError as exc:
             raise FileOperationError(
                 f"Failed to read JSON from {file_path}: {exc}") from exc
@@ -184,7 +187,7 @@ class FileHandler:
         data: str,
         path: PathLike,
         mode: str = "w",
-        add_newline_prefix: bool = True,
+        add_newline_prefix: bool = False,
     ) -> None:
         """Save a string to a text file.
 
@@ -192,7 +195,8 @@ class FileHandler:
             data: Content to write.
             path: Destination file.
             mode: ``"w"`` to overwrite or ``"a"`` to append.
-            add_newline_prefix: Write a newline before the content.
+            add_newline_prefix: Write a newline before the content (handy when
+            appending to a file that doesn't end with one).
 
         Raises:
             ValueError: If ``mode`` is not ``"w"`` or ``"a"``.
@@ -203,7 +207,8 @@ class FileHandler:
         file_path = self.ensure_writable_path(path)
         try:
             if mode == "w":
-                atomic_write_text(file_path, ("\n" if add_newline_prefix else "") + data)
+                atomic_write_text(
+                    file_path, ("\n" if add_newline_prefix else "") + data)
             else:
                 with open(file_path, "a", encoding="utf-8") as f:
                     if add_newline_prefix:

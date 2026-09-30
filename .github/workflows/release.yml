@@ -42,6 +42,16 @@ jobs:
           else
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
+      
+      - name: Require changelog entry
+        env:
+          VERSION: ${{ steps.tag.outputs.VERSION }}
+        run: |
+          NUM="${VERSION#v}"
+          if ! grep -qF "## [${NUM}]" CHANGELOG.md; then
+            echo "No changelog entry for ${NUM}. Add one, then re-tag."
+            exit 1
+          fi
 
       - name: Extract changelog section and title
         id: extract

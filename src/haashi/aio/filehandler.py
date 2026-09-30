@@ -77,14 +77,9 @@ class FileHandler:
 
     # ---- JSON ---------------------------------------------------------------
 
-    async def save_json(
-        self,
-        data: JSONType,
-        path: PathLike,
-        indent: int = 4,
-    ) -> None:
+    async def save_json(self, data: JSONType, path: PathLike, indent: int = 4) -> None:
         """Save JSON-serializable data to a file (atomic)."""
-        await asyncio.to_thread(self._sync.save_json, data, path, indent)
+        await asyncio.to_thread(self._sync.save_json, data, path, indent=indent)
 
     async def read_json(self, path: PathLike) -> JSONType:
         """Read a JSON file."""
@@ -97,11 +92,12 @@ class FileHandler:
         data: str,
         path: PathLike,
         mode: str = "w",
-        add_newline_prefix: bool = True,
+        add_newline_prefix: bool = False,
     ) -> None:
         """Save a string to a text file (``"w"`` overwrite, ``"a"`` append)."""
         await asyncio.to_thread(
-            self._sync.save_txt, data, path, mode, add_newline_prefix)
+            self._sync.save_txt, data, path,
+            mode=mode, add_newline_prefix=add_newline_prefix)
 
     async def read_txt(self, path: PathLike) -> str:
         """Read a text file."""

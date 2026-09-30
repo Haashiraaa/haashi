@@ -40,10 +40,15 @@ def test_public_api_and_version() -> None:
 
 def test_no_third_party_imports() -> None:
     code = (
-        "import sys; before = set(sys.modules); import haashi;"
-        "import sys as s; new = {m.split('.')[0] for m in set(s.modules) - before};"
+        "import sys; before = set(sys.modules);"
+        "import haashi, haashi.utility as u;"
+        "[getattr(u, n) for n in u.__all__];"
+        "new = {m.split('.')[0] for m in set(sys.modules) - before};"
         "print(','.join(sorted(new)))"
     )
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "-c", code],
+                            capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert "pydantic" not in result.stdout
+    found = {m for m in result.stdout.strip().split(",") if m}
+    extra = found - set(sys.stdlib_module_names) - {"haashi"}
+    assert not extra, f"non-stdlib modules imported: {sorted(extra)}"

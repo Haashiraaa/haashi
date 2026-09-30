@@ -122,6 +122,21 @@ class ErrorLogger:
         return detect_script_dir() / error_path if use_script_dir else error_path
 
     @staticmethod
+    def _quarantine(path: Path, problem: str) -> None:
+        """Move an unreadable log aside (never overwriting an earlier backup)."""
+        backup = path.with_name(path.name + ".corrupt")
+        n = 0
+        while backup.exists():
+            n += 1
+            backup = path.with_name(f"{path.name}.corrupt.{n}")
+        path.replace(backup)
+        warnings.warn(
+            f"{problem} at {path}; moved it to {backup} and starting a fresh log.",
+            RuntimeWarning,
+            stacklevel=4,
+        )
+
+    @staticmethod
     def _read_error_entries(path: Path) -> list[JSONType]:
         """Read existing entries; a missing or corrupt file yields ``[]``."""
         if not path.exists():
@@ -130,24 +145,10 @@ class ErrorLogger:
             with open(path, encoding="utf-8") as f:
                 entries = json.load(f)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            backup = path.with_name(path.name + ".corrupt")
-            path.replace(backup)
-            warnings.warn(
-                f"Corrupted error log at {path} ({exc}); moved it to {backup} "
-                f"and starting a fresh log.",
-                RuntimeWarning,
-                stacklevel=3,
-            )
+            ErrorLogger._quarantine(path, f"Corrupted error log ({exc})")
             return []
         if not isinstance(entries, list):
-            backup = path.with_name(path.name + ".corrupt")
-            path.replace(backup)
-            warnings.warn(
-                f"Error log at {path} is not a JSON list; moved it to {backup} "
-                f"and starting a fresh log.",
-                RuntimeWarning,
-                stacklevel=3,
-            )
+            ErrorLogger._quarantine(path, "Error log is not a JSON list")
             return []
         return cast("list[JSONType]", entries)
 
@@ -184,7 +185,8 @@ class ErrorLogger:
             ValueError: If ``max_entries`` < 1 or the offset is out of range.
         """
         if max_entries < 1:
-            raise ValueError(f"max_entries must be at least 1, got {max_entries}")
+            raise ValueError(
+                f"max_entries must be at least 1, got {max_entries}")
 
         error_path = self._resolve_path(path, use_script_dir)
 
@@ -355,7 +357,8 @@ class Logger:
         text = str(message)
         if save_to_json:
             if exception is None:
-                raise LoggingError("save_to_json=True requires an `exception` argument")
+                raise LoggingError(
+                    "save_to_json=True requires an `exception` argument")
             saved_to = self._persist(
                 exception, error_logger, path, use_script_dir, context)
             text = f"{text}\nSee {saved_to} for details"
@@ -385,10 +388,12 @@ class Logger:
         """
         exc = sys.exc_info()[1]
         if exc is None:
-            raise LoggingError("logger.exception() must be called inside an `except` block")
+            raise LoggingError(
+                "logger.exception() must be called inside an `except` block")
 
-        self.logger.error(str(message), exc_info=True)  # noqa: LOG014
+        text = str(message)
         if save_to_json:
             saved_to = self._persist(
                 exc, error_logger, path, use_script_dir, context)
-            self.logger.info(f"Exception logged to {saved_to}")
+            text = f"{text}\nSee {saved_to} for details"
+        self.logger.error(text, exc_info=True)

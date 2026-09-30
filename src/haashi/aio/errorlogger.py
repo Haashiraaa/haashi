@@ -47,8 +47,9 @@ class ErrorLogger:
     ) -> Path:
         """Append an error entry to the JSON log and return the file's path."""
         return await asyncio.to_thread(
-            self._sync.log_error, exception, context, path,
-            use_script_dir, utc_offset_hours, max_entries)
+            self._sync.log_error, exception,
+            context=context, path=path, use_script_dir=use_script_dir,
+            utc_offset_hours=utc_offset_hours, max_entries=max_entries)
 
     async def view_error_entries(
         self,
@@ -58,7 +59,8 @@ class ErrorLogger:
     ) -> list[JSONType]:
         """Return the most recent ``limit`` entries (``None`` for all)."""
         return await asyncio.to_thread(
-            self._sync.view_error_entries, path, limit, use_script_dir)
+            self._sync.view_error_entries,
+            path=path, limit=limit, use_script_dir=use_script_dir)
 
     async def clear_errors(
         self,
@@ -73,4 +75,5 @@ class ErrorLogger:
         ``LoggingError`` otherwise. Servers should pass ``confirm=False``.
         """
         return await asyncio.to_thread(
-            self._sync.clear_errors, path, use_script_dir, confirm=confirm)
+            self._sync.clear_errors,
+            path=path, use_script_dir=use_script_dir, confirm=confirm)

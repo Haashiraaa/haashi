@@ -81,7 +81,7 @@ Output is colored by level using the [`Colors`](#screenutil-and-colors) class â€
 import logging
 from haashi.utility import Logger
 
-logger = Logger(level=logging.INFO)          # Logger(level, color=None)
+logger = Logger(level=logging.INFO)   # Logger(level, color=None, error_logger=None)
 logger.info("Processing started")
 
 try:
@@ -116,6 +116,11 @@ errors.clear_errors(confirm=False)               # confirm=True prompts (interac
 ```
 
 A corrupted log file emits a `RuntimeWarning` and starts fresh instead of crashing your app.
+
+> **Note:** each `log_error` call rewrites the log file and `fsync`s it, under a
+> process-wide lock. That is ideal for occasional errors, but it is not a
+> high-volume logger. For error storms, log to the console (or a proper log
+> shipper) and persist only the ones you need to keep.
 
 ### FileHandler
 

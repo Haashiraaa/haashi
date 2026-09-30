@@ -73,7 +73,8 @@ class Benchmark:
             ctx = self._sync._suppress_output() if suppress_output else nullcontext()
             with ctx:
                 if warmup_times:
-                    self.logger.debug(f"Warming up function {warmup_times} times...")
+                    self.logger.debug(
+                        f"Warming up function {warmup_times} times...")
                     for _ in range(warmup_times):
                         await self._call(target)
                     self.logger.debug("Warmup complete.")
@@ -87,9 +88,9 @@ class Benchmark:
                     batches.append(time.perf_counter() - start)
 
             per_call = min(batches) / run_times
-            self.logger.debug(f"Average execution time: {per_call:.4f} seconds")
+            self.logger.debug(
+                f"Average execution time: {per_call:.4f} seconds")
             return per_call
         except Exception as exc:
-            raise BenchmarkError(f"Failed to benchmark function: {exc}") from exc
-
-
+            raise BenchmarkError(
+                f"Failed to benchmark function: {exc}") from exc

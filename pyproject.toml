@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ dynamic = ["version"]
 description = "A lightweight, dependency-free Python utility toolkit: logging, file I/O, terminal helpers, datetime and benchmarking."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Haashiraaa", email = "terryfregene.dev@gmail.com"}
 ]
@@ -24,22 +25,20 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Typing :: Typed",
 ]
 
-# Zero runtime dependencies - this is a headline feature. Keep it that way.
-dependencies = []
-
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.1.1",
-    "pytest-cov>=7.1.0",
-    "ruff>=0.16.3",
-    "pyright>=1.1.411",
-    "autopep8>=2.3.2",
-    "build>=1.2.0",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.16.3",
+    "pyright==1.1.414",
+    "autopep8==2.3.2",
+    "build==1.2.0",
+    "twine==5.0.0",
 ]
 
 [project.urls]

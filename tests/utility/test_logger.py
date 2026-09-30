@@ -54,9 +54,12 @@ def test_log_error_prunes_to_max_entries(tmp_path: Path) -> None:
     el = ErrorLogger()
     log = tmp_path / "e.json"
     for i in range(5):
-        el.log_error(boom(), context=str(i), path=log, use_script_dir=False, max_entries=3)
+        el.log_error(boom(), context=str(i), path=log,
+                     use_script_dir=False, max_entries=3)
     entries = el.view_error_entries(path=log, use_script_dir=False, limit=None)
+    # fmt: off
     assert [e["context"] for e in entries] == ["2", "3", "4"]  # type: ignore[index]
+    # fmt: on
 
 
 def test_timestamp_respects_utc_offset(tmp_path: Path) -> None:
@@ -70,9 +73,11 @@ def test_timestamp_respects_utc_offset(tmp_path: Path) -> None:
 def test_log_error_rejects_bad_arguments(tmp_path: Path) -> None:
     el = ErrorLogger()
     with pytest.raises(ValueError):
-        el.log_error(boom(), path=tmp_path / "e.json", use_script_dir=False, max_entries=0)
+        el.log_error(boom(), path=tmp_path / "e.json",
+                     use_script_dir=False, max_entries=0)
     with pytest.raises(ValueError):
-        el.log_error(boom(), path=tmp_path / "e.json", use_script_dir=False, utc_offset_hours=99)
+        el.log_error(boom(), path=tmp_path / "e.json",
+                     use_script_dir=False, utc_offset_hours=99)
 
 
 def test_corrupt_log_warns_and_recovers(tmp_path: Path) -> None:
@@ -99,7 +104,8 @@ def test_view_and_clear_use_the_same_file_as_log_error(
     # Default use_script_dir=True everywhere: what is written must be readable/clearable.
     import haashi.utility.logger as logger_mod
 
-    monkeypatch.setattr(logger_mod, "detect_script_dir", lambda *_a, **_k: tmp_path)
+    monkeypatch.setattr(logger_mod, "detect_script_dir",
+                        lambda *_a, **_k: tmp_path)
     el = ErrorLogger()
     saved = el.log_error(boom())
     assert saved == tmp_path / "logs" / "errors_log.json"
@@ -110,11 +116,13 @@ def test_view_and_clear_use_the_same_file_as_log_error(
 
 def test_view_error_entries_limit_validation(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
-        ErrorLogger().view_error_entries(path=tmp_path / "x.json", use_script_dir=False, limit=0)
+        ErrorLogger().view_error_entries(path=tmp_path /
+                                         "x.json", use_script_dir=False, limit=0)
 
 
 def test_clear_errors_missing_file_returns_false(tmp_path: Path) -> None:
-    assert ErrorLogger().clear_errors(tmp_path / "nope.json", False, confirm=False) is False
+    assert ErrorLogger().clear_errors(
+        tmp_path / "nope.json", False, confirm=False) is False
 
 
 def test_clear_errors_refuses_to_prompt_when_not_interactive(
@@ -130,7 +138,8 @@ def test_clear_errors_refuses_to_prompt_when_not_interactive(
 
 
 @pytest.mark.parametrize(
-    ("answer", "deleted"), [("y", True), ("YES", True), ("n", False), ("", False)]
+    ("answer", "deleted"), [("y", True),
+                            ("YES", True), ("n", False), ("", False)]
 )
 def test_clear_errors_prompt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, answer: str, deleted: bool
@@ -163,7 +172,8 @@ def test_logger_error_uses_supplied_error_logger(tmp_path: Path) -> None:
     class Spy(ErrorLogger):
         called = 0
 
-        def log_error(self, *args, **kwargs) -> Path:  # type: ignore[no-untyped-def]
+        # type: ignore[no-untyped-def]
+        def log_error(self, *args, **kwargs) -> Path:
             Spy.called += 1
             return super().log_error(*args, **kwargs)
 
@@ -241,9 +251,11 @@ def test_color_false_never_emits_ansi(
     method: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     lg = Logger(logging.DEBUG, color=False)
-    _handler(lg).setStream(_FakeTTY())  # a real terminal, but color is forced off
+    # a real terminal, but color is forced off
+    _handler(lg).setStream(_FakeTTY())
     getattr(lg, method)("msg")
-    assert "\033[" not in _handler(lg).stream.getvalue()  # type: ignore[attr-defined]
+    # type: ignore[attr-defined]
+    assert "\033[" not in _handler(lg).stream.getvalue()
 
 
 def test_auto_color_is_off_when_not_a_terminal(capsys: pytest.CaptureFixture[str]) -> None:
@@ -283,7 +295,8 @@ def test_closed_stream_does_not_crash_color_detection() -> None:
     _handler(lg).setStream(stream)
     stream.close()
     # isatty() on a closed stream raises ValueError; detection must swallow it.
-    from haashi.utility.logger import _color_enabled  # pyright: ignore[reportPrivateUsage]
+    # pyright: ignore[reportPrivateUsage]
+    from haashi.utility.logger import _color_enabled
 
     assert _color_enabled(stream, None) is False
 
@@ -322,13 +335,15 @@ def test_log_dir_wins_over_use_script_dir(tmp_path: Path) -> None:
 
 def test_absolute_path_beats_log_dir(tmp_path: Path) -> None:
     target = tmp_path / "elsewhere" / "e.json"
-    saved = ErrorLogger(log_dir=tmp_path / "svc").log_error(boom(), path=target)
+    saved = ErrorLogger(log_dir=tmp_path /
+                        "svc").log_error(boom(), path=target)
     assert saved == target and target.exists()
     assert not (tmp_path / "svc").exists()
 
 
 def test_log_dir_expands_user(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     assert ErrorLogger(log_dir="~/logs").log_dir == tmp_path / "logs"
 
 
