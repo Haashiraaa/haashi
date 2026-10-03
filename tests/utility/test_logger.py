@@ -12,6 +12,12 @@ import pytest
 
 from haashi.utility import Colors, ErrorLogger, FileHandler, JsonlErrorLogger, Logger, LoggingError
 
+# fmt: off
+from haashi.utility._filelock import file_lock  # pyright: ignore[reportPrivateUsage]
+
+# fmt: on
+from haashi.utility.logger import _iter_lines_reverse
+
 
 def boom() -> Exception:
     try:
@@ -536,3 +542,54 @@ def test_critical_uses_the_loggers_default_error_logger(tmp_path: Path) -> None:
     lg = Logger(error_logger=ErrorLogger(log_dir=tmp_path))
     lg.critical("x", exception=boom(), save_to_json=True)
     assert (tmp_path / "errors_log.json").exists()
+
+
+def test_lock_timeout_is_enforced(tmp_path: Path) -> None:
+    target = tmp_path / "e.jsonl"
+    with (
+        file_lock(target),
+        pytest.raises(LoggingError, match="Timed out"),
+        file_lock(target, timeout=0.1),
+    ):
+        pass
+
+
+def test_lock_is_released_after_use(tmp_path: Path) -> None:
+    target = tmp_path / "e.jsonl"
+    with file_lock(target):
+        pass
+    with file_lock(target, timeout=0.5):  # would raise if the first lock leaked
+        pass
+
+
+def test_negative_lock_timeout_rejected() -> None:
+    with pytest.raises(ValueError):
+        JsonlErrorLogger(lock_timeout=-1)
+
+
+@pytest.mark.parametrize("chunk", [1, 3, 7, 64 * 1024])
+def test_reverse_line_reader_handles_chunk_boundaries(tmp_path: Path, chunk: int) -> None:
+    f = tmp_path / "x.jsonl"
+    f.write_bytes("a\n\nbé\nccc\n".encode())  # blank line + multibyte char
+    assert list(_iter_lines_reverse(f, chunk)) == [b"ccc", "bé".encode(), b"a"]
+
+
+def test_view_limit_returns_the_newest_entries_across_backups(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path, max_bytes=1500, backups=3)
+    for i in range(80):
+        el.log_error(ValueError(f"e{i}"))
+    last = _messages(list(el.view_error_entries(limit=5)))
+    assert last == [f"e{i}" for i in range(75, 80)]
+    everything = _messages(list(el.view_error_entries(limit=None)))
+    assert everything[-5:] == last and everything == sorted(
+        everything, key=lambda m: int(m[1:]))
+
+
+def test_skipped_lines_do_not_count_toward_limit(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path)
+    for i in range(3):
+        el.log_error(ValueError(f"e{i}"))
+    with open(tmp_path / "errors_log.jsonl", "a", encoding="utf-8") as f:
+        f.write('{"torn": ')
+    with pytest.warns(RuntimeWarning, match="unreadable"):
+        assert _messages(list(el.view_error_entries(limit=2))) == ["e1", "e2"]

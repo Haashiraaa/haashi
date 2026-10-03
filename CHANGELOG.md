@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- README rewritten as a high-level overview; documentation split into focused pages under `docs/` and updated for `JsonlErrorLogger`, the cross-process lock and the `ErrorWriter` protocol.
+
+## [1.3.1] - 2026-10-03 - Lock Timeout & Cheaper Reads
+
+### Fixed
+- `JsonlErrorLogger(lock_timeout=...)` is now enforced on POSIX as well as Windows. Previously a worker holding the lock indefinitely could stall every other worker; waiters now give up with `LoggingError` after `lock_timeout` seconds.
+
+### Changed
+- `JsonlErrorLogger.view_error_entries(limit=N)` now reads each file backwards and stops after `N` valid entries instead of loading the whole log and its backups. Cost is proportional to `N`, not the log size.
+- `lock_timeout` is validated (`ValueError` if negative).
+
 ## [1.3.0] - 2026-10-03 - JsonlErrorLogger for Backends
 
 ### Added

@@ -12,7 +12,7 @@ import sys
 import threading
 import traceback
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, ClassVar, TextIO, cast
 
@@ -251,6 +251,31 @@ class ErrorLogger:
         return True
 
 
+def _iter_lines_reverse(path: Path, chunk: int = 64 * 1024) -> Iterator[bytes]:
+    """Yield the non-blank lines of ``path`` from last to first.
+
+    Reads backwards in ``chunk``-sized blocks, so memory stays bounded however
+    large the file is. Splitting on ``b"\n"`` is safe for UTF-8: that byte never
+    appears inside a multi-byte character.
+    """
+    with open(path, "rb") as f:
+        pos = f.seek(0, os.SEEK_END)
+        buf = b""
+        while pos > 0:
+            size = min(chunk, pos)
+            pos -= size
+            f.seek(pos)
+            buf = f.read(size) + buf
+            parts = buf.split(b"\n")
+            # may be the tail of a line that started in an earlier chunk
+            buf = parts[0]
+            for line in reversed(parts[1:]):
+                if line.strip():
+                    yield line
+        if buf.strip():
+            yield buf
+
+
 class JsonlErrorLogger:
     """Error log that appends one JSON object per line.
 
@@ -303,8 +328,8 @@ class JsonlErrorLogger:
             backups: Rotated files to keep (0 = just discard on rotation).
             fsync: Force every entry to disk. Slow, but survives power loss.
                 Off by default: entries still survive a process crash.
-            lock_timeout: Seconds to wait for the cross-process lock (enforced
-                on Windows; POSIX locks are released if the holder dies).
+            lock_timeout: Seconds to wait for the cross-process lock before
+                raising ``LoggingError`` (0 = try once). Enforced on every platform. 
 
         Raises:
             ValueError: If a number is out of range.
@@ -313,6 +338,9 @@ class JsonlErrorLogger:
             raise ValueError(f"max_bytes must be at least 1, got {max_bytes}")
         if backups < 0:
             raise ValueError(f"backups must be 0 or more, got {backups}")
+        if lock_timeout < 0:
+            raise ValueError(
+                f"lock_timeout must be 0 or more, got {lock_timeout}")
         self.log_dir: Path | None = (
             Path(log_dir).expanduser() if log_dir is not None else None)
         self.max_bytes = max_bytes
@@ -360,29 +388,41 @@ class JsonlErrorLogger:
             if self.fsync:
                 os.fsync(f.fileno())
 
-    def _read_entries(self, path: Path) -> list[JSONType]:
-        """All entries, oldest first. Garbled lines are skipped with a warning."""
-        entries: list[JSONType] = []
+    def _read_entries(self, path: Path, limit: int | None) -> list[JSONType]:
+        """The last ``limit`` entries (all if None), oldest first.
+
+        Reads newest-first (live file, then ``.1``, ``.2``, ...) from the end of
+        each file and stops as soon as it has enough, so ``limit=10`` on a
+        500 MB log touches a few KB. Unparseable lines (e.g. one cut short by a
+        hard crash) are skipped with a warning and don't count toward ``limit``.
+        """
+        newest_first: list[JSONType] = []
         skipped = 0
-        for file in self._all_files(path):
+        done = False
+        for file in reversed(self._all_files(path)):
+            if done:
+                break
             if not file.exists():
                 continue
-            with open(file, encoding="utf-8", errors="replace") as f:
-                for raw in f:
-                    raw = raw.strip()
-                    if not raw:
-                        continue
-                    try:
-                        entries.append(json.loads(raw))
-                    except json.JSONDecodeError:
-                        skipped += 1  # e.g. a line cut short by a hard crash
+            for raw in _iter_lines_reverse(file):
+                try:
+                    entry: JSONType = json.loads(
+                        raw.decode("utf-8", errors="replace"))
+                except json.JSONDecodeError:
+                    skipped += 1
+                    continue
+                newest_first.append(entry)
+                if limit is not None and len(newest_first) >= limit:
+                    done = True
+                    break
         if skipped:
             warnings.warn(
                 f"Skipped {skipped} unreadable line(s) in error log {path}",
                 RuntimeWarning,
                 stacklevel=3,
             )
-        return entries
+        newest_first.reverse()
+        return newest_first
 
     # ---- public API (same names as ErrorLogger) -----------------------------
 
@@ -444,8 +484,7 @@ class JsonlErrorLogger:
         if not any(f.exists() for f in self._all_files(log_path)):
             return []
         with _THREAD_LOCK, file_lock(log_path, self.lock_timeout):
-            entries = self._read_entries(log_path)
-        return entries if limit is None else entries[-limit:]
+            return self._read_entries(log_path, limit)
 
     def clear_errors(
         self,
