@@ -15,7 +15,7 @@ from pathlib import Path
 _REPLACE_RETRIES = 5
 
 
-def _replace(src: Path, dst: Path) -> None:
+def replace_file(src: Path, dst: Path) -> None:
     """``os.replace`` with a short retry for transient Windows file locks."""
     for attempt in range(_REPLACE_RETRIES):
         try:
@@ -66,7 +66,7 @@ def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
             os.fsync(f.fileno())
         if mode is not None:
             os.chmod(tmp, mode)
-        _replace(tmp, target)
+        replace_file(tmp, target)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise

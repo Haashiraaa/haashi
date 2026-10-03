@@ -10,6 +10,7 @@ using only the standard library.
 Classes:
     Logger: Console logging with optional JSON error persistence
     ErrorLogger: Rotating JSON error log
+    JsonlErrorLogger: JSONL error log
     FileHandler: JSON/TXT I/O and script-relative path helpers
     ScreenUtil: Loading animation and text wrapping
     DateTime: Timezone-aware current time
@@ -39,6 +40,7 @@ TYPE_CHECKING = False
 __all__ = [
     "Logger",
     "ErrorLogger",
+    "JsonlErrorLogger",
     "FileHandler",
     "ScreenUtil",
     "DateTime",
@@ -60,6 +62,7 @@ __all__ = [
 _LAZY: dict[str, str] = {
     "Logger": ".logger",
     "ErrorLogger": ".logger",
+    "JsonlErrorLogger": ".logger",
     "FileHandler": ".filehandler",
     "ScreenUtil": ".uiux",
     "Colors": ".uiux",
@@ -109,5 +112,5 @@ if TYPE_CHECKING:
         UtilityError,
     )
     from .filehandler import FileHandler
-    from .logger import ErrorLogger, Logger
+    from .logger import ErrorLogger, JsonlErrorLogger, Logger
     from .uiux import Colors, ScreenUtil

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # avoids a runtime import cycle with logger.py
+    from ._types import PathLike
     from .logger import Logger
 
 
@@ -55,3 +56,27 @@ def detect_script_dir(logger: Logger | None = None) -> Path:
         logger.warning(
             "Could not detect main script location, using current directory")
     return Path.cwd()
+
+
+def resolve_log_path(
+    path: PathLike | None,
+    log_dir: Path | None,
+    default_name: str,
+    use_script_dir: bool,
+) -> Path:
+    """Resolve a log file location.
+
+    Absolute ``path`` wins; relative paths (and the default name) resolve under
+    ``log_dir`` if set, else next to the running script or the cwd.
+    """
+    if path is not None:
+        log_path = Path(path)
+        if log_path.is_absolute():
+            return log_path
+        if log_dir is not None:
+            return log_dir / log_path
+    elif log_dir is not None:
+        return log_dir / default_name
+    else:
+        log_path = Path("logs") / default_name
+    return detect_script_dir() / log_path if use_script_dir else log_path

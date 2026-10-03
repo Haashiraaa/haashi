@@ -41,11 +41,13 @@ from ..utility.logger import Logger
 from ..utility.uiux import Colors
 from .benchmark import Benchmark
 from .errorlogger import ErrorLogger
+from .jsonl_errorlogger import JsonlErrorLogger
 from .filehandler import FileHandler
 
 __all__ = [
     "FileHandler",
     "ErrorLogger",
+    "JsonlErrorLogger",
     "Benchmark",
     "Logger",
     "DateTime",

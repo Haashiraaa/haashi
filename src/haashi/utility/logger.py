@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+
 import itertools
 import json
 import logging
@@ -16,14 +17,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar, TextIO, cast
 
-from ._atomic import atomic_write_text
+from ._atomic import atomic_write_text, replace_file
 from ._datetime import DateTime
-from ._paths import detect_script_dir
-from ._types import JSONType, PathLike
+from ._filelock import file_lock
+from ._paths import resolve_log_path
+from ._types import JSONType, PathLike, ErrorWriter
 from .exceptions import LoggingError
 from .uiux import Colors
 
 DEFAULT_ERROR_LOG_FILENAME = "errors_log.json"
+DEFAULT_ERROR_LOG_FILENAME_JSONL = "errors_log.jsonl"
 DEFAULT_ERROR_LOG_PATH = Path("logs") / DEFAULT_ERROR_LOG_FILENAME
 
 _logger_ids = itertools.count()  # unique per Logger, never reused (unlike id())
@@ -31,6 +34,9 @@ _logger_ids = itertools.count()  # unique per Logger, never reused (unlike id())
 # Serializes read-modify-write cycles on error-log files across threads.
 # (Multiple *processes* writing one file still need external coordination.)
 _LOG_LOCK = threading.RLock()
+
+# Cheap in-process exclusion on top of the cross-process file lock.
+_THREAD_LOCK = threading.RLock()
 
 
 def _color_enabled(stream: TextIO, color: bool | None) -> bool:
@@ -108,19 +114,6 @@ class ErrorLogger:
         self.log_dir: Path | None = (
             Path(log_dir).expanduser() if log_dir is not None else None)
 
-    def _resolve_path(self, path: PathLike | None, use_script_dir: bool) -> Path:
-        if path is not None:
-            error_path = Path(path)
-            if error_path.is_absolute():
-                return error_path
-            if self.log_dir is not None:
-                return self.log_dir / error_path
-        elif self.log_dir is not None:
-            return self.log_dir / DEFAULT_ERROR_LOG_FILENAME
-        else:
-            error_path = DEFAULT_ERROR_LOG_PATH
-        return detect_script_dir() / error_path if use_script_dir else error_path
-
     @staticmethod
     def _quarantine(path: Path, problem: str) -> None:
         """Move an unreadable log aside (never overwriting an earlier backup)."""
@@ -135,6 +128,10 @@ class ErrorLogger:
             RuntimeWarning,
             stacklevel=4,
         )
+
+    def _resolve_path(self, path: PathLike | None, use_script_dir: bool) -> Path:
+        return resolve_log_path(
+            path, self.log_dir, DEFAULT_ERROR_LOG_FILENAME, use_script_dir)
 
     @staticmethod
     def _read_error_entries(path: Path) -> list[JSONType]:
@@ -216,6 +213,7 @@ class ErrorLogger:
         with _LOG_LOCK:
             entries = self._read_error_entries(
                 self._resolve_path(path, use_script_dir))
+
         return entries if limit is None else entries[-limit:]
 
     def clear_errors(
@@ -254,6 +252,239 @@ class ErrorLogger:
         return True
 
 
+class JsonlErrorLogger:
+    """Error log that appends one JSON object per line.
+
+    Unlike :class:`ErrorLogger`, which rewrites a whole JSON array on every
+    call, this never reads or rewrites the file: each error is a single
+    append, so the cost stays flat however large the log gets. Every write
+    takes a cross-process file lock, so several processes (for example
+    gunicorn workers) can share one log without losing entries.
+
+    Use ``ErrorLogger`` for occasional errors and a human-friendly file; use
+    this for backends, error bursts and multi-worker servers. Same method
+    names, so ``Logger(error_logger=JsonlErrorLogger(...))`` works unchanged.
+
+    Rotation is by size: when a write would push the file past ``max_bytes``
+    it becomes ``<file>.1`` (older ones shift to ``.2``, ``.3``, ...), and the
+    oldest beyond ``backups`` is dropped.
+
+    Where the file lives follows the same rules as ``ErrorLogger``: absolute
+    ``path`` wins; relative paths resolve under ``log_dir`` if set, else next
+    to the running script (``use_script_dir=True``) or the current directory.
+    The default file is ``logs/errors_log.jsonl``.
+
+    Limits: advisory locks are unreliable on network filesystems (NFS/SMB),
+    so don't share one log across hosts.
+
+    Example:
+        >>> errors = JsonlErrorLogger(log_dir="/var/log/myapp",
+        ...                           max_bytes=5_000_000, backups=5)
+        >>> try:
+        ...     1 / 0
+        ... except ZeroDivisionError as exc:
+        ...     errors.log_error(exc, context="math")
+        >>> errors.view_error_entries(limit=5)
+    """
+
+    def __init__(
+        self,
+        log_dir: PathLike | None = None,
+        *,
+        max_bytes: int | None = None,
+        backups: int = 3,
+        fsync: bool = False,
+        lock_timeout: float = 10.0,
+    ) -> None:
+        """
+        Args:
+            log_dir: Directory relative log paths resolve under (``~`` expanded).
+            max_bytes: Rotate once the file would exceed this size. ``None``
+                never rotates (the log grows without bound).
+            backups: Rotated files to keep (0 = just discard on rotation).
+            fsync: Force every entry to disk. Slow, but survives power loss.
+                Off by default: entries still survive a process crash.
+            lock_timeout: Seconds to wait for the cross-process lock (enforced
+                on Windows; POSIX locks are released if the holder dies).
+
+        Raises:
+            ValueError: If a number is out of range.
+        """
+        if max_bytes is not None and max_bytes < 1:
+            raise ValueError(f"max_bytes must be at least 1, got {max_bytes}")
+        if backups < 0:
+            raise ValueError(f"backups must be 0 or more, got {backups}")
+        self.log_dir: Path | None = (
+            Path(log_dir).expanduser() if log_dir is not None else None)
+        self.max_bytes = max_bytes
+        self.backups = backups
+        self.fsync = fsync
+        self.lock_timeout = lock_timeout
+
+    # ---- internals ----------------------------------------------------------
+
+    def _resolve_path(self, path: PathLike | None, use_script_dir: bool) -> Path:
+        return resolve_log_path(
+            path, self.log_dir, DEFAULT_ERROR_LOG_FILENAME_JSONL, use_script_dir)
+
+    @staticmethod
+    def _backup(path: Path, n: int) -> Path:
+        return path.with_name(f"{path.name}.{n}")
+
+    def _all_files(self, path: Path) -> list[Path]:
+        """Rotated backups (oldest first), then the live file."""
+        return [self._backup(path, n) for n in range(self.backups, 0, -1)] + [path]
+
+    def _rotate_if_needed(self, path: Path, incoming: int) -> None:
+        if self.max_bytes is None:
+            return
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            return
+        if size == 0 or size + incoming <= self.max_bytes:
+            return
+        if self.backups == 0:
+            path.unlink(missing_ok=True)
+            return
+        for i in range(self.backups - 1, 0, -1):
+            older = self._backup(path, i)
+            if older.exists():
+                replace_file(older, self._backup(path, i + 1))
+        replace_file(path, self._backup(path, 1))
+
+    def _append(self, path: Path, data: bytes) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "ab") as f:  # "ab" opens with O_APPEND
+            f.write(data)
+            f.flush()
+            if self.fsync:
+                os.fsync(f.fileno())
+
+    def _read_entries(self, path: Path) -> list[JSONType]:
+        """All entries, oldest first. Garbled lines are skipped with a warning."""
+        entries: list[JSONType] = []
+        skipped = 0
+        for file in self._all_files(path):
+            if not file.exists():
+                continue
+            with open(file, encoding="utf-8", errors="replace") as f:
+                for raw in f:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        entries.append(json.loads(raw))
+                    except json.JSONDecodeError:
+                        skipped += 1  # e.g. a line cut short by a hard crash
+        if skipped:
+            warnings.warn(
+                f"Skipped {skipped} unreadable line(s) in error log {path}",
+                RuntimeWarning,
+                stacklevel=3,
+            )
+        return entries
+
+    # ---- public API (same names as ErrorLogger) -----------------------------
+
+    def log_error(
+        self,
+        exception: BaseException,
+        context: str | None = None,
+        path: PathLike | None = None,
+        use_script_dir: bool = True,
+        utc_offset_hours: float = 0,
+    ) -> Path:
+        """Append an error entry and return the path of the file written.
+
+        Args:
+            exception: The exception to record.
+            context: Free-form label such as "data_loading".
+            path: Log file (default ``logs/errors_log.jsonl``).
+            use_script_dir: Resolve a relative ``path`` next to the running
+                script instead of the current directory. Ignored when
+                ``log_dir`` is set.
+            utc_offset_hours: UTC offset used for the timestamp (-12 to +14).
+
+        Raises:
+            ValueError: If the offset is out of range.
+            LoggingError: If the cross-process lock can't be acquired in time.
+        """
+        log_path = self._resolve_path(path, use_script_dir)
+        entry: dict[str, JSONType] = {
+            "timestamp": DateTime.get_current_time(
+                utc_offset_hours, string_format=False).isoformat(),
+            "type": type(exception).__name__,
+            "message": str(exception),
+            "context": context or "unspecified",
+            "traceback": "".join(traceback.format_exception(exception)),
+        }
+        # json.dumps escapes newlines inside strings: one entry is always one line.
+        data = (json.dumps(entry, default=str, separators=(
+            ",", ":")) + "\n").encode("utf-8")
+
+        with _THREAD_LOCK, file_lock(log_path, self.lock_timeout):
+            self._rotate_if_needed(log_path, len(data))
+            self._append(log_path, data)
+        return log_path
+
+    def view_error_entries(
+        self,
+        path: PathLike | None = None,
+        limit: int | None = 10,
+        use_script_dir: bool = True,
+    ) -> list[JSONType]:
+        """Return the most recent ``limit`` entries (``None`` for all).
+
+        Reads rotated backups too, oldest first. A missing log returns ``[]``
+        and creates nothing.
+        """
+        if limit is not None and limit < 1:
+            raise ValueError(f"limit must be at least 1 or None, got {limit}")
+        log_path = self._resolve_path(path, use_script_dir)
+        if not any(f.exists() for f in self._all_files(log_path)):
+            return []
+        with _THREAD_LOCK, file_lock(log_path, self.lock_timeout):
+            entries = self._read_entries(log_path)
+        return entries if limit is None else entries[-limit:]
+
+    def clear_errors(
+        self,
+        path: PathLike | None = None,
+        use_script_dir: bool = True,
+        *,
+        confirm: bool = True,
+    ) -> bool:
+        """Delete the log and its rotated backups. True if anything was deleted.
+
+        Args:
+            confirm: Ask on the terminal first. Needs an interactive session;
+                pass ``confirm=False`` in scripts, CI, or servers.
+
+        Raises:
+            LoggingError: If ``confirm=True`` but stdin is not interactive.
+        """
+        log_path = self._resolve_path(path, use_script_dir)
+        if not any(f.exists() for f in self._all_files(log_path)):
+            return False
+
+        if confirm:
+            if not sys.stdin.isatty():
+                raise LoggingError(
+                    "clear_errors(confirm=True) needs an interactive terminal; "
+                    "pass confirm=False in non-interactive code."
+                )
+            answer = input(
+                f"Delete all entries in {log_path}? This cannot be undone. [y/N] ")
+            if answer.strip().lower() not in {"y", "yes"}:
+                return False
+
+        with _THREAD_LOCK, file_lock(log_path, self.lock_timeout):
+            for file in self._all_files(log_path):
+                file.unlink(missing_ok=True)
+        return True
+
+
 class Logger:
     """Console logger with optional JSON persistence for errors.
 
@@ -277,7 +508,7 @@ class Logger:
         self,
         level: int = logging.WARNING,
         color: bool | None = None,
-        error_logger: ErrorLogger | None = None,
+        error_logger: ErrorWriter | None = None,
     ) -> None:
         """
         Args:
@@ -318,7 +549,7 @@ class Logger:
     def _persist(
         self,
         exception: BaseException,
-        error_logger: ErrorLogger | None,
+        error_logger: ErrorWriter | None,
         path: PathLike | None,
         use_script_dir: bool,
         context: str | None,
@@ -333,7 +564,7 @@ class Logger:
         self,
         emit: Callable[[str], None],
         message: Any,
-        error_logger: ErrorLogger | None,
+        error_logger: ErrorWriter | None,
         path: PathLike | None,
         exception: BaseException | None,
         save_to_json: bool,
@@ -354,7 +585,7 @@ class Logger:
     def error(
         self,
         message: Any = "Error occurred!",
-        error_logger: ErrorLogger | None = None,
+        error_logger: ErrorWriter | None = None,
         path: PathLike | None = None,
         exception: BaseException | None = None,
         save_to_json: bool = False,
@@ -383,7 +614,7 @@ class Logger:
     def critical(
         self,
         message: Any = "Critical error!",
-        error_logger: ErrorLogger | None = None,
+        error_logger: ErrorWriter | None = None,
         path: PathLike | None = None,
         exception: BaseException | None = None,
         save_to_json: bool = False,
@@ -414,7 +645,7 @@ class Logger:
     def exception(
         self,
         message: Any = "Exception occurred!",
-        error_logger: ErrorLogger | None = None,
+        error_logger: ErrorWriter | None = None,
         save_to_json: bool = False,
         path: PathLike | None = None,
         use_script_dir: bool = True,
