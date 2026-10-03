@@ -9,10 +9,10 @@ Subpackages:
              (import it explicitly: ``from haashi.aio import FileHandler``).
 """
 
-from . import utility
+from . import aio, utility
 
 # Single source of truth for the version (read statically by setuptools).
 # Keep this a plain string literal.
 __version__ = "1.3.1"
 
-__all__ = ["utility"]
+__all__ = ["utility", "aio"]
