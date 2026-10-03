@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-03 - JsonlErrorLogger for Backends
+
+### Added
+- `JsonlErrorLogger`: an append-only alternative to `ErrorLogger` that writes
+  one JSON object per line. No read or rewrite per call, so cost stays flat
+  as the log grows; safe for threads, async tasks and multiple worker
+  processes sharing one file (cross-process file lock: `fcntl` on POSIX,
+  `msvcrt` on Windows). Size-based rotation via `max_bytes` / `backups`,
+  optional `fsync`, same method names as `ErrorLogger`. Available as
+  `haashi.utility.JsonlErrorLogger` and, awaitable, `haashi.aio.JsonlErrorLogger`.
+- `Logger(error_logger=...)` now accepts any object with a compatible
+  `log_error` method, including `JsonlErrorLogger`.
+
 
 ## [1.2.0] - 2026-10-01 - Logger.critical & Documentation
 

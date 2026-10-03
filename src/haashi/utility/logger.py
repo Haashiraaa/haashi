@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-
 import itertools
 import json
 import logging
@@ -20,8 +19,8 @@ from typing import Any, ClassVar, TextIO, cast
 from ._atomic import atomic_write_text, replace_file
 from ._datetime import DateTime
 from ._filelock import file_lock
-from ._paths import resolve_log_path
-from ._types import JSONType, PathLike, ErrorWriter
+from ._paths import detect_script_dir, resolve_log_path  # noqa: F401 # type: ignore
+from ._types import ErrorWriter, JSONType, PathLike
 from .exceptions import LoggingError
 from .uiux import Colors
 

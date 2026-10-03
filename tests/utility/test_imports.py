@@ -12,6 +12,7 @@ MODULES = [
     "haashi.utility._atomic",
     "haashi.utility._types",
     "haashi.utility._datetime",
+    "haashi.utility._filelock",
     "haashi.utility.exceptions",
     "haashi.utility.uiux",
     "haashi.utility.logger",

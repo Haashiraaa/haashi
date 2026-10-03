@@ -10,6 +10,7 @@ from haashi import aio
 from haashi.utility import Benchmark as SyncBenchmark
 from haashi.utility import ErrorLogger as SyncErrorLogger
 from haashi.utility import FileHandler as SyncFileHandler
+from haashi.utility import JsonlErrorLogger as SyncJsonlErrorLogger
 
 # ---- API parity: the whole point of "same names" ------------------------------
 
@@ -23,6 +24,7 @@ PAIRS = [
     ("FileHandler", SyncFileHandler, aio.FileHandler),
     ("ErrorLogger", SyncErrorLogger, aio.ErrorLogger),
     ("Benchmark", SyncBenchmark, aio.Benchmark),
+    ("JsonlErrorLogger", SyncJsonlErrorLogger, aio.JsonlErrorLogger),
 ]
 
 
@@ -70,6 +72,9 @@ def test_io_methods_are_coroutines_and_path_helpers_are_not() -> None:
     for name in ("log_error", "view_error_entries", "clear_errors"):
         assert inspect.iscoroutinefunction(
             getattr(aio.ErrorLogger, name)), name
+    for name in ("log_error", "view_error_entries", "clear_errors"):
+        assert inspect.iscoroutinefunction(
+            getattr(aio.JsonlErrorLogger, name)), name
     assert inspect.iscoroutinefunction(aio.Benchmark.measure_time)
 
 

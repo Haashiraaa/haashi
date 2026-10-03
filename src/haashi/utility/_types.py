@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import TypeAlias, Protocol
+from typing import Protocol, TypeAlias
 
 from .exceptions import InvalidJsonFormatError
 

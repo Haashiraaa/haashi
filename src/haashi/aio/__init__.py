@@ -16,7 +16,7 @@ Import from here instead of ``haashi.utility``::
     await fh.save_json({"status": "ok"}, "data/output.json")
 
 What is async:
-    FileHandler, ErrorLogger, Benchmark  (disk IO / timing of coroutines)
+    FileHandler, ErrorLogger, JsonlErrorLogger, Benchmark  (disk IO / timing of coroutines)
 
 What is re-exported unchanged (already fast and safe in async code):
     Logger, DateTime, Colors and all exceptions. ``Logger`` methods are plain
@@ -41,8 +41,8 @@ from ..utility.logger import Logger
 from ..utility.uiux import Colors
 from .benchmark import Benchmark
 from .errorlogger import ErrorLogger
-from .jsonl_errorlogger import JsonlErrorLogger
 from .filehandler import FileHandler
+from .jsonl_errorlogger import JsonlErrorLogger
 
 __all__ = [
     "FileHandler",

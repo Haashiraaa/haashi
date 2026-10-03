@@ -1,13 +1,16 @@
 import io
 import json
 import logging
+import multiprocessing
 import sys
+import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 
-from haashi.utility import Colors, ErrorLogger, FileHandler, Logger, LoggingError
+from haashi.utility import Colors, ErrorLogger, FileHandler, JsonlErrorLogger, Logger, LoggingError
 
 
 def boom() -> Exception:
@@ -102,9 +105,9 @@ def test_view_and_clear_use_the_same_file_as_log_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Default use_script_dir=True everywhere: what is written must be readable/clearable.
-    import haashi.utility.logger as logger_mod
+    import haashi.utility._paths as paths_mod
 
-    monkeypatch.setattr(logger_mod, "detect_script_dir",
+    monkeypatch.setattr(paths_mod, "detect_script_dir",
                         lambda *_a, **_k: tmp_path)
     el = ErrorLogger()
     saved = el.log_error(boom())
@@ -359,13 +362,145 @@ def test_logger_uses_default_error_logger_and_call_can_override(tmp_path: Path) 
     assert (tmp_path / "other" / "errors_log.json").exists()
 
 
+# ---- jsonl logger (backend use) ----------------------------------------------
+
+def _worker(log_dir: str, worker: int, n: int) -> None:
+    el = JsonlErrorLogger(log_dir=log_dir)
+    for i in range(n):
+        el.log_error(ValueError(f"{worker}-{i}"))
+
+
+def _messages(entries: list[object]) -> list[str]:
+    return [cast("dict[str, str]", e)["message"] for e in entries]
+
+
+def test_many_processes_share_one_log_without_losing_entries(tmp_path: Path) -> None:
+    ctx = multiprocessing.get_context("spawn")
+    procs = [ctx.Process(target=_worker, args=(str(tmp_path), w, 40))
+             for w in range(4)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(120)
+        assert p.exitcode == 0
+
+    entries = JsonlErrorLogger(log_dir=tmp_path).view_error_entries(limit=None)
+    assert len(entries) == 160
+    assert len(set(_messages(list(entries)))) == 160
+
+
+def test_many_threads_lose_nothing(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path)
+
+    def work(w: int) -> None:
+        for i in range(25):
+            el.log_error(ValueError(f"{w}-{i}"))
+
+    threads = [threading.Thread(target=work, args=(n,)) for n in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(el.view_error_entries(limit=None)) == 200
+
+
+def test_default_file_and_entry_format(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path)
+    saved = el.log_error(boom(), context="ctx", utc_offset_hours=1)
+    assert saved == tmp_path / "errors_log.jsonl"
+    entry = json.loads(saved.read_text().splitlines()[0])
+    assert entry["type"] == "ValueError" and entry["context"] == "ctx"
+    assert entry["timestamp"].endswith("+01:00")
+    assert "boom" in entry["traceback"]
+
+
+def test_one_line_per_entry_even_with_newlines(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path)
+    el.log_error(ValueError("line1\nline2"))
+    lines = (tmp_path / "errors_log.jsonl").read_text().splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0])["message"] == "line1\nline2"
+
+
+def test_rotates_by_size_and_keeps_newest(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path, max_bytes=1500, backups=2)
+    for i in range(60):
+        el.log_error(ValueError(f"e{i}"))
+
+    names = sorted(p.name for p in tmp_path.iterdir()
+                   if not p.name.endswith(".lock"))
+    assert names == ["errors_log.jsonl",
+                     "errors_log.jsonl.1", "errors_log.jsonl.2"]
+    entries = el.view_error_entries(limit=None)
+    assert _messages(list(entries))[-1] == "e59"
+    assert len(entries) < 60
+
+
+def test_zero_backups_discards_on_rotation(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path, max_bytes=600, backups=0)
+    for i in range(20):
+        el.log_error(ValueError(f"e{i}"))
+    names = sorted(p.name for p in tmp_path.iterdir()
+                   if not p.name.endswith(".lock"))
+    assert names == ["errors_log.jsonl"]
+
+
+def test_skips_a_torn_line(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path)
+    el.log_error(ValueError("ok"))
+    with open(tmp_path / "errors_log.jsonl", "a", encoding="utf-8") as f:
+        f.write('{"torn": ')
+    with pytest.warns(RuntimeWarning, match="unreadable"):
+        assert len(el.view_error_entries()) == 1
+
+
+def test_clear_removes_backups_too(tmp_path: Path) -> None:
+    el = JsonlErrorLogger(log_dir=tmp_path, max_bytes=600, backups=2)
+    for i in range(20):
+        el.log_error(ValueError(f"e{i}"))
+    assert el.clear_errors(confirm=False) is True
+    assert el.view_error_entries(limit=None) == []
+    assert el.clear_errors(confirm=False) is False
+
+
+def test_viewing_a_missing_log_creates_nothing(tmp_path: Path) -> None:
+    assert JsonlErrorLogger(
+        log_dir=tmp_path / "nope").view_error_entries() == []
+    assert not (tmp_path / "nope").exists()
+
+
+def test_absolute_path_beats_log_dir_jsonl(tmp_path: Path) -> None:
+    target = tmp_path / "elsewhere" / "e.jsonl"
+    saved = JsonlErrorLogger(
+        log_dir=tmp_path / "svc").log_error(boom(), path=target)
+    assert saved == target and target.exists()
+    assert not (tmp_path / "svc").exists()
+
+
+def test_bad_options_are_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        JsonlErrorLogger(max_bytes=0)
+    with pytest.raises(ValueError):
+        JsonlErrorLogger(backups=-1)
+    with pytest.raises(ValueError):
+        JsonlErrorLogger(log_dir=tmp_path).view_error_entries(limit=0)
+
+
+def test_logger_can_persist_through_it(tmp_path: Path) -> None:
+    lg = Logger(error_logger=JsonlErrorLogger(log_dir=tmp_path))
+    lg.error("failed", exception=boom(), save_to_json=True)
+    lg.critical("fatal", exception=boom(), save_to_json=True)
+    assert len((tmp_path / "errors_log.jsonl").read_text().splitlines()) == 2
+
 # ---- critical -----------------------------------------------------------------
+
 
 def test_critical_logs_at_critical_level_styled_like_errors(
     capsys: pytest.CaptureFixture[str]
 ) -> None:
     Logger(logging.DEBUG, color=True).critical("meltdown")
-    assert capsys.readouterr().err == Colors.error("[CRITICAL] meltdown") + "\n"
+    assert capsys.readouterr().err == Colors.error(
+        "[CRITICAL] meltdown") + "\n"
 
 
 def test_critical_is_plain_when_not_a_terminal(capsys: pytest.CaptureFixture[str]) -> None:
