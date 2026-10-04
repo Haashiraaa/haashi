@@ -8,6 +8,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.3.2] - 2026-10-03 - CI Expansion & Test Reorganization
+
+## CI Improvements
+
+### Matrix Optimization
+- Added a `plan` job to dynamically generate test matrices based on branch context
+  - **Full matrix** (Python 3.10–3.14 across Ubuntu, macOS, Windows) runs on main branch and PRs targeting main
+  - **Reduced matrix** (Python 3.10 & 3.14 on Ubuntu & Windows) runs on feature branches
+  - Reduces CI runtime and resource usage for non-mainline development
+- Added branch concurrency control to cancel superseded runs, preserving main branch stability
+- Extended CI to run on all branches (previously only main) to catch issues earlier
+
+### Reliability & Gating
+- Added single stable check name (`ci-ok`) for branch protection rules
+  - Resolves matrix name variability between full and reduced configurations
+  - Gates PyPI publishing on lint, type checks, and test success
+
+## Test Suite Reorganization
+
+### Test Structure
+Tests have been reorganized from flat functions into logical test classes grouped by functionality, improving maintainability and readability:
+
+#### `tests/utility/test_backend_safety.py`
+- **`TestErrorLoggerSafety`**: Concurrency and corruption handling
+- **`TestLoggerRegistry`**: Logger isolation and registry behavior
+- **`TestAtomicWrites`**: File atomicity and rollback on failure
+
+#### `tests/utility/test_benchmark.py`
+- **`TestMeasureTime`**: Timing and call count validation
+- **`TestValidation`**: Parameter and callable type checking
+- **`TestOutputSuppression`**: Output capture and logging state preservation
+
+#### `tests/utility/test_datetime_uiux.py`
+- **`TestDateTime`**: Timezone offsets, format options, and range validation
+- **`TestColors`**: ANSI color application and styling
+- **`TestScreenUtil`**: Text wrapping and animation output
+
+#### `tests/utility/test_filehandler.py`
+- **`TestJson`**: JSON round-trip, serialization, and error handling
+- **`TestText`**: Text file write, append, and read operations
+- **`TestPathHelpers`**: Directory traversal and ancestor lookup
+
+#### `tests/utility/test_imports.py`
+- **`TestImports`**: Fresh interpreter imports and third-party dependency validation
+
+#### `tests/utility/test_lazy_init.py`
+- **`TestLazyTable`**: Lazy module table consistency
+- **`TestModuleProtocol`**: `dir()`, `__getattr__`, and star import behavior
+- **`TestImportBehavior`**: Lazy loading and import cost profiling
+
+#### `tests/utility/test_logger.py`
+- **`TestLoggerIsolation`**: Independent logger instances and registry isolation
+- **`TestLoggerColors`**: ANSI output based on TTY detection and `NO_COLOR` env
+- **`TestLoggerPersistence`**: Error persistence and custom error logger injection
+- **`TestLoggerCritical`**: Critical-level logging and persistence
+- **`TestErrorLogger`**: Error log appending, pruning, and corruption recovery
+- **`TestErrorLoggerClear`**: Interactive and non-interactive deletion
+- **`TestErrorLoggerLogDir`**: Log directory resolution and path precedence
+- **`TestJsonlErrorLogger`**: JSONL format, validation, and default file naming
+- **`TestJsonlConcurrency`**: Multi-process and multi-threaded safety
+- **`TestJsonlRotation`**: Size-based rotation, backup management, and cleanup
+- **`TestJsonlReading`**: Corrupt line skipping, reverse reading, and limit semantics
+- **`TestFileLock`**: Cross-process locking and timeout enforcement
+
+#### `tests/aio/test_aio.py`
+- **`TestApiParity`**: Async method availability and signature matching
+- **`TestAsyncFileHandler`**: Async I/O, thread offloading, and event loop responsiveness
+- **`TestAsyncErrorLogger`**: Concurrent async error logging and cross-process lock sharing
+- **`TestAsyncBenchmark`**: Coroutine timing, plain function support, and error wrapping
+- **`TestImportCost`**: Import-time overhead validation (asyncio not preloaded)
+
+### Test Fixtures & Helpers
+- Added `tests/utility/conftest.py` with shared pytest fixtures (e.g., `fh` for `FileHandler`)
+- Added `tests/utility/helpers.py` for shared helper functions:
+  - `boom()`: Generate exceptions with real tracebacks
+  - `FakeTTY`: Mock terminal for color detection testing
+  - `get_handler()`, `messages()`, `worker()`: Test utilities
+  - `_type_checking_imports()`: Introspection of lazy-loading configuration
+- Added `tests/aio/helpers.py` with async test utilities:
+  - `EXPECTED_DIFFERENCES`, `PAIRS`: API parity test data
+  - `_public_methods()`: Reflection utility
+
+### Import & Performance
+- All tests now guard against `asyncio` import during `haashi` initialization
+- All tests verify `typing` module is not loaded by bare `import haashi`
+- Tests confirm lazy-loading reduces startup cost
+
+## Version & Documentation
+
+- Version bumped to `1.3.2` (development)
+- Updated module docstrings for `haashi`, `haashi.utility`, and `haashi.aio` with clearer summaries
+- File permission fixes for consistency (executable → normal mode on test and config files)
+
+
 
 ## [1.3.1] - 2026-10-03 - Lock Timeout & Cheaper Reads
 
