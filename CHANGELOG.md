@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- README rewritten as a high-level overview; documentation split into focused pages under `docs/` and updated for `JsonlErrorLogger`, the cross-process lock and the `ErrorWriter` protocol.
 
 ## [1.3.1] - 2026-10-03 - Lock Timeout & Cheaper Reads
 
@@ -20,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `JsonlErrorLogger.view_error_entries(limit=N)` now reads each file backwards and stops after `N` valid entries instead of loading the whole log and its backups. Cost is proportional to `N`, not the log size.
 - `lock_timeout` is validated (`ValueError` if negative).
+- README rewritten as a high-level overview; documentation split into focused pages under `docs/` and updated for `JsonlErrorLogger`, the cross-process lock and the `ErrorWriter` protocol.
 
 ## [1.3.0] - 2026-10-03 - JsonlErrorLogger for Backends
 
