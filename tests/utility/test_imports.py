@@ -1,3 +1,5 @@
+
+
 """Every module must import cleanly in a fresh interpreter (catches import cycles)."""
 
 import subprocess
@@ -21,35 +23,34 @@ MODULES = [
 ]
 
 
-@pytest.mark.parametrize("module", MODULES)
-def test_module_imports_in_fresh_interpreter(module: str) -> None:
-    result = subprocess.run(
-        [sys.executable, "-c", f"import {module}"],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 0, result.stderr
+class TestImports:
+    @pytest.mark.parametrize("module", MODULES)
+    def test_module_imports_in_fresh_interpreter(self, module: str) -> None:
+        result = subprocess.run(
+            [sys.executable, "-c", f"import {module}"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
 
+    def test_public_api_and_version(self) -> None:
+        import haashi
+        import haashi.utility as util
 
-def test_public_api_and_version() -> None:
-    import haashi
-    import haashi.utility as util
+        assert isinstance(haashi.__version__, str)
+        for name in util.__all__:
+            assert hasattr(util, name), name
 
-    assert isinstance(haashi.__version__, str)
-    for name in util.__all__:
-        assert hasattr(util, name), name
-
-
-def test_no_third_party_imports() -> None:
-    code = (
-        "import sys; before = set(sys.modules);"
-        "import haashi, haashi.utility as u;"
-        "[getattr(u, n) for n in u.__all__];"
-        "new = {m.split('.')[0] for m in set(sys.modules) - before};"
-        "print(','.join(sorted(new)))"
-    )
-    result = subprocess.run([sys.executable, "-c", code],
-                            capture_output=True, text=True)
-    assert result.returncode == 0, result.stderr
-    found = {m for m in result.stdout.strip().split(",") if m}
-    extra = found - set(sys.stdlib_module_names) - {"haashi"}
-    assert not extra, f"non-stdlib modules imported: {sorted(extra)}"
+    def test_no_third_party_imports(self) -> None:
+        code = (
+            "import sys; before = set(sys.modules);"
+            "import haashi, haashi.utility as u;"
+            "[getattr(u, n) for n in u.__all__];"
+            "new = {m.split('.')[0] for m in set(sys.modules) - before};"
+            "print(','.join(sorted(new)))"
+        )
+        result = subprocess.run([sys.executable, "-c", code],
+                                capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        found = {m for m in result.stdout.strip().split(",") if m}
+        extra = found - set(sys.stdlib_module_names) - {"haashi"}
+        assert not extra, f"non-stdlib modules imported: {sorted(extra)}"
