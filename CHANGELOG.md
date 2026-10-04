@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
-## [1.3.1] - 2026-10-03 - Lock Timeout & Cheaper Reads
+## [1.3.1] - 2026-10-04 - Lock Timeout & Cheaper Reads
 
 ### Fixed
 - `JsonlErrorLogger(lock_timeout=...)` is now enforced on POSIX as well as Windows. Previously a worker holding the lock indefinitely could stall every other worker; waiters now give up with `LoggingError` after `lock_timeout` seconds.
