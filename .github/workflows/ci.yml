@@ -1,21 +1,50 @@
+
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
 
 permissions:
   contents: read
 
+# Cancel superseded runs on the same branch/PR, never on main.
+# Push runs and PR runs use different groups, so they can't cancel each other.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      os: ${{ steps.matrix.outputs.os }}
+      python: ${{ steps.matrix.outputs.python }}
+    steps:
+      - id: matrix
+        env:
+          REF: ${{ github.ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$REF" = "refs/heads/main" ] || [ "$BASE_REF" = "main" ]; then
+            echo "Full matrix (main or PR into main)"
+            echo 'os=["ubuntu-latest","macos-latest","windows-latest"]' >> "$GITHUB_OUTPUT"
+            echo 'python=["3.10","3.11","3.12","3.13","3.14"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "Reduced matrix (feature branch)"
+            echo 'os=["ubuntu-latest","windows-latest"]' >> "$GITHUB_OUTPUT"
+            echo 'python=["3.10","3.14"]' >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: plan
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
+        python-version: ${{ fromJSON(needs.plan.outputs.python) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,3 +98,19 @@ jobs:
           assert res.files("haashi").joinpath("py.typed").is_file(), "py.typed missing"
           print("ok", haashi.__version__)
           PY
+
+  # Single stable check name for branch protection. The test matrix job names
+  # change between the full and reduced matrix, so you can't require them directly.
+  ci-ok:
+    if: always()
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          case "$RESULTS" in
+            *failure*|*cancelled*|*skipped*) exit 1 ;;
+          esac

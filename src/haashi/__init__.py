@@ -1,8 +1,13 @@
+"""haashi: lightweight, dependency-free Python utility toolkit.
 
-# src/haashi/__init__.py
+This package exposes two public submodules:
+- ``haashi.utility``: synchronous helpers for structured logging, file I/O,
+  datetime handling, terminal styling, and benchmarking.
+- ``haashi.aio``: async wrappers around the same features, offloading
+  filesystem work to worker threads so the event loop stays responsive.
 
-"""haashi - a lightweight, dependency-free utility toolkit.
-...
+The project intentionally keeps a small standard-library-only surface area and
+avoids third-party runtime dependencies.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ if TYPE_CHECKING:
 
 # Single source of truth for the version (read statically by setuptools).
 # Keep this a plain string literal.
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 __all__ = ["utility", "aio"]
 

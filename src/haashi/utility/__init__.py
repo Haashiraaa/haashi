@@ -1,33 +1,19 @@
-# src/haashi/utility/__init__.py
-
 """
-Utility package for haashi
-==========================
+Utility helpers for haashi.
 
-Logging, file I/O, terminal helpers, datetime helpers and benchmarking,
-using only the standard library.
+This package provides lightweight, standard-library-only utilities for:
+- structured logging and error persistence
+- file I/O and script-relative path helpers
+- datetime handling
+- terminal styling and UI utilities
+- benchmarking and function timing
 
-Classes:
-    Logger: Console logging with optional JSON error persistence
-    ErrorLogger: Rotating JSON error log
-    JsonlErrorLogger: JSONL error log
-    FileHandler: JSON/TXT I/O and script-relative path helpers
-    ScreenUtil: Loading animation and text wrapping
-    DateTime: Timezone-aware current time
-    Colors: ANSI color codes and styles
-    Benchmark: Function timing with warmup
-
-Exceptions (all inherit from UtilityError):
-    FileOperationError, InvalidJsonFormatError, LoggingError,
-    BenchmarkError, InvalidFunctionError, BenchmarkTimeoutError
-
-Example:
-    >>> import logging
-    >>> from haashi.utility import Logger, FileHandler, Benchmark
-    >>> logger = Logger(level=logging.INFO)
-    >>> fh = FileHandler(logger=logger)
-    >>> fh.save_json({"status": "ok"}, "output.json")
-    >>> Benchmark(logger=logger).measure_time(lambda: sum(range(1_000_000)))
+Public exports include:
+- ``Logger``, ``ErrorLogger``, ``JsonlErrorLogger``
+- ``FileHandler``
+- ``DateTime``, ``Colors``, ``ScreenUtil``
+- ``Benchmark``
+- exception types for file operations, logging, and benchmark failures
 """
 
 from __future__ import annotations
