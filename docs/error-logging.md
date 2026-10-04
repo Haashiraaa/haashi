@@ -128,7 +128,9 @@ errors.log_error(
 ) -> Path
 ```
 
-One lock acquisition, one optional rotation, one append. There is no `max_entries`; retention is controlled by rotation.**Raises** `ValueError` (bad offset) or `LoggingError` (lock not acquired within `lock_timeout`). 
+One lock acquisition, one optional rotation, one append. There is no `max_entries`; retention is controlled by rotation. 
+
+**Raises** `ValueError` (bad offset) or `LoggingError` (lock not acquired within `lock_timeout`). 
 
 ### `view_error_entries`
 

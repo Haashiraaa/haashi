@@ -329,7 +329,7 @@ class JsonlErrorLogger:
             fsync: Force every entry to disk. Slow, but survives power loss.
                 Off by default: entries still survive a process crash.
             lock_timeout: Seconds to wait for the cross-process lock before
-                raising ``LoggingError`` (0 = try once). Enforced on every platform. 
+                raising ``LoggingError`` (0 = try once). Enforced on every platform.
 
         Raises:
             ValueError: If a number is out of range.

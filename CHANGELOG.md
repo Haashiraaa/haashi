@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `JsonlErrorLogger(lock_timeout=...)` is now enforced on POSIX as well as Windows. Previously a worker holding the lock indefinitely could stall every other worker; waiters now give up with `LoggingError` after `lock_timeout` seconds.
 - `haashi.aio` is now exposed at the top level, so it can be accessed directly as `haashi.aio` in addition to explicit imports such as `from haashi.aio import FileHandler`.
-
+- `import haashi` no longer imports typing. 
 
 ### Changed
 - `JsonlErrorLogger.view_error_entries(limit=N)` now reads each file backwards and stops after `N` valid entries instead of loading the whole log and its backups. Cost is proportional to `N`, not the log size.

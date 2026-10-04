@@ -18,7 +18,6 @@ UtilityError
 | `FileOperationError` | `FileHandler.*` | permission denied, path is a directory, invalid JSON on read, undecodable text |
 | `InvalidJsonFormatError` | `save_json` | sets, custom objects, `NaN`/`Infinity`, circular references |
 | `LoggingError` | `Logger.error/critical`, `clear_errors`, JSONL lock | `save_to_json=True` without `exception`; `exception()` outside `except`; `confirm=True` without a terminal; cross-process lock timeout |
-| `lock_timeout` | ≥ 0 | `ValueError` |
 | `BenchmarkError` | `Benchmark.measure_time` | your function raised |
 | `InvalidFunctionError` | `Benchmark.measure_time` | argument isn't callable |
 | `BenchmarkTimeoutError` | (nothing yet) | reserved |
@@ -133,6 +132,7 @@ Benchmark.measure_time(..., suppress_output=False)          # default differs
 | `limit` (view) | ≥ 1 or `None` | `ValueError` |
 | `max_bytes` | ≥ 1 or `None` | `ValueError` |
 | `backups` | ≥ 0 | `ValueError` |
+| `lock_timeout` | ≥ 0 | `ValueError` |
 | `run_times`, `repeat_times` | ≥ 1 | `ValueError` |
 | `warmup_times` | ≥ 0 | `ValueError` |
 | `save_txt` `mode` | `"w"` or `"a"` | `ValueError` |
