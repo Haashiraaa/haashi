@@ -1,29 +1,15 @@
-
-# src/haashi/aio/__init__.py
-
 """
-Async API for haashi
-====================
+Async API for haashi.
 
-The same class and method names as :mod:`haashi.utility`, but every method that
-touches the disk is awaitable and runs in a worker thread, so it never blocks
-your event loop (FastAPI, aiohttp, Starlette, plain ``asyncio``...).
+This package mirrors the synchronous ``haashi.utility`` API while making
+filesystem-heavy operations awaitable. Methods that touch the disk are
+executed in worker threads via ``asyncio.to_thread``, which keeps the event
+loop responsive during I/O-bound work.
 
-Import from here instead of ``haashi.utility``::
-
-    from haashi.aio import FileHandler, ErrorLogger, Logger
-
-    fh = FileHandler()
-    await fh.save_json({"status": "ok"}, "data/output.json")
-
-What is async:
-    FileHandler, ErrorLogger, JsonlErrorLogger, Benchmark  (disk IO / timing of coroutines)
-
-What is re-exported unchanged (already fast and safe in async code):
-    Logger, DateTime, Colors and all exceptions. ``Logger`` methods are plain
-    calls: logging a line does not need ``await``.
-
-Nothing here adds dependencies; it is built on ``asyncio.to_thread``.
+Public exports include:
+- ``FileHandler``, ``ErrorLogger``, ``JsonlErrorLogger``, ``Benchmark``
+- ``Logger``, ``DateTime``, ``Colors``
+- exception types re-exported from the sync package
 """
 
 from __future__ import annotations
