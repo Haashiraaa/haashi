@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 # Single source of truth for the version (read statically by setuptools).
 # Keep this a plain string literal.
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 __all__ = ["utility", "aio"]
 
